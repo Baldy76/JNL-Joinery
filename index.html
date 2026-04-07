@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>David's Joinery App</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <nav class="bg-blue-600 p-4 text-white shadow-lg">
+        <h1 class="text-xl font-bold">David's Joinery</h1>
+    </nav>
+
+    <main class="p-4 max-w-md mx-auto">
+        <div class="bg-white p-6 rounded-xl shadow-md mb-6">
+            <h2 class="text-lg font-semibold mb-4 text-gray-700">Create New Quote</h2>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-600">Customer Name</label>
+                    <input type="text" id="custName" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-600">Job Description</label>
+                    <textarea id="jobDesc" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-600">Total Price (£)</label>
+                    <input type="number" id="jobPrice" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+
+                <button onclick="generatePDF()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition">
+                    Generate PDF Quote
+                </button>
+            </div>
+        </div>
+
+        <div id="status" class="text-center text-xs text-gray-500">
+            App ready for offline use.
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+    </script>
+</body>
+</html>
