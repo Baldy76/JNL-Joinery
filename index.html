@@ -41,7 +41,7 @@
         <section id="view-dashboard" class="view-section active">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-3xl font-black text-[#4a3728]">My Jobs</h2>
-                <span class="bg-[#8b5a2b] text-white text-xs font-bold px-3 py-1 rounded-full"><i class="fa-solid fa-chart-line mr-1"></i> Overview</span>
+                <span class="bg-[#8b5a2b] text-white text-xs font-bold px-3 py-1 rounded-full"><i class="fa-solid fa-address-book mr-1"></i> CRM Active</span>
             </div>
             <div id="quoteList" class="space-y-4"></div>
         </section>
@@ -52,11 +52,22 @@
             <div class="bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-stone-100 mb-6 space-y-4 relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-1 bg-blue-500"></div>
                 <div>
-                    <label class="text-xs font-bold text-stone-500 uppercase ml-1 tracking-wider"><i class="fa-solid fa-user text-blue-500 mr-2 text-sm"></i>Customer Name</label>
-                    <input type="text" id="custName" class="ios-input mt-2" placeholder="e.g. John Smith">
+                    <label class="text-xs font-bold text-stone-500 uppercase ml-1 tracking-wider"><i class="fa-solid fa-user text-blue-500 mr-2"></i>Customer Name</label>
+                    <input type="text" id="custName" list="clientList" class="ios-input mt-2" placeholder="e.g. John Smith" onchange="fillClientDetails()">
+                    <datalist id="clientList"></datalist>
+                </div>
+                <div class="flex space-x-4">
+                    <div class="flex-1">
+                        <label class="text-xs font-bold text-stone-500 uppercase ml-1 tracking-wider"><i class="fa-solid fa-phone text-blue-400 mr-2"></i>Phone</label>
+                        <input type="tel" id="custPhone" class="ios-input mt-2" placeholder="07...">
+                    </div>
+                    <div class="flex-1">
+                        <label class="text-xs font-bold text-stone-500 uppercase ml-1 tracking-wider"><i class="fa-solid fa-envelope text-blue-400 mr-2"></i>Email</label>
+                        <input type="email" id="custEmail" class="ios-input mt-2" placeholder="@">
+                    </div>
                 </div>
                 <div>
-                    <label class="text-xs font-bold text-stone-500 uppercase ml-1 tracking-wider"><i class="fa-solid fa-map-location-dot text-indigo-500 mr-2 text-sm"></i>Job Description / Address</label>
+                    <label class="text-xs font-bold text-stone-500 uppercase ml-1 tracking-wider"><i class="fa-solid fa-map-location-dot text-indigo-500 mr-2"></i>Job Description / Address</label>
                     <textarea id="jobDesc" class="ios-input mt-2" rows="2" placeholder="e.g. Fitted wardrobes, 10 High St"></textarea>
                 </div>
             </div>
@@ -64,7 +75,11 @@
             <div class="bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-stone-100 mb-6 relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-1 bg-amber-500"></div>
                 <div class="flex justify-between items-end border-b border-stone-100 pb-3 mb-4">
-                    <h3 class="font-extrabold text-stone-700 text-lg"><i class="fa-solid fa-toolbox text-amber-500 mr-2"></i>Materials List</h3>
+                    <h3 class="font-extrabold text-stone-700 text-lg"><i class="fa-solid fa-toolbox text-amber-500 mr-2"></i>Materials</h3>
+                    <div class="flex items-center">
+                        <label class="text-xs font-bold text-stone-500 mr-2 uppercase">Markup %</label>
+                        <input type="number" id="materialMarkup" class="ios-input w-20 py-1 px-2 text-center text-sm font-bold text-amber-700 calc-trigger" placeholder="0">
+                    </div>
                 </div>
                 <div id="materialsContainer" class="space-y-3"></div>
                 <button onclick="addMaterialRow()" class="mt-5 text-sm font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 py-3 px-4 rounded-xl w-full transition transform active:scale-95 border border-amber-200">
@@ -136,9 +151,15 @@
             
             <div class="bg-white p-6 rounded-3xl shadow-sm border border-stone-100 space-y-4 mb-6">
                 <h3 class="font-bold text-stone-700 text-lg border-b border-stone-100 pb-3"><i class="fa-solid fa-sliders text-blue-500 mr-2"></i>App Preferences</h3>
-                <div>
-                    <label class="text-xs font-bold text-stone-500 uppercase ml-1">Default Hourly Rate (£)</label>
-                    <input type="number" id="defaultRate" class="ios-input mt-2" placeholder="e.g. 25.00">
+                <div class="flex space-x-4">
+                    <div class="flex-1">
+                        <label class="text-xs font-bold text-stone-500 uppercase ml-1">Default Rate (£/hr)</label>
+                        <input type="number" id="defaultRate" class="ios-input mt-2" placeholder="25.00">
+                    </div>
+                    <div class="flex-1">
+                        <label class="text-xs font-bold text-stone-500 uppercase ml-1">Default Markup (%)</label>
+                        <input type="number" id="defaultMarkup" class="ios-input mt-2" placeholder="20">
+                    </div>
                 </div>
             </div>
 
@@ -146,16 +167,16 @@
                 <h3 class="font-bold text-stone-700 text-lg border-b border-stone-100 pb-3"><i class="fa-solid fa-building-columns text-emerald-500 mr-2"></i>Bank Details</h3>
                 <div>
                     <label class="text-xs font-bold text-stone-500 uppercase ml-1">Account Name</label>
-                    <input type="text" id="bankName" class="ios-input mt-2" placeholder="e.g. David Joinery">
+                    <input type="text" id="bankName" class="ios-input mt-2">
                 </div>
                 <div class="flex space-x-4">
                     <div class="flex-1">
                         <label class="text-xs font-bold text-stone-500 uppercase ml-1">Sort Code</label>
-                        <input type="text" id="bankSort" class="ios-input mt-2" placeholder="00-00-00">
+                        <input type="text" id="bankSort" class="ios-input mt-2">
                     </div>
                     <div class="flex-1">
                         <label class="text-xs font-bold text-stone-500 uppercase ml-1">Account No.</label>
-                        <input type="text" id="bankAcc" class="ios-input mt-2" placeholder="12345678">
+                        <input type="text" id="bankAcc" class="ios-input mt-2">
                     </div>
                 </div>
                 <button onclick="saveSettings()" class="w-full bg-[#8b5a2b] text-white font-bold py-4 rounded-2xl transform active:scale-95 transition mt-4 shadow-md">
@@ -166,9 +187,9 @@
             <div class="bg-white p-6 rounded-3xl shadow-sm border border-red-100 space-y-4">
                 <h3 class="font-bold text-red-600 text-lg border-b border-red-50 pb-3"><i class="fa-solid fa-triangle-exclamation mr-2"></i>Danger Zone</h3>
                 <button onclick="clearDatabase()" class="w-full bg-red-50 text-red-600 border border-red-200 font-bold py-4 rounded-2xl transform active:scale-95 transition">
-                    Wipe Database (Delete Quotes)
+                    Wipe Database (Delete Quotes & Clients)
                 </button>
-                <p class="text-center text-xs font-bold text-stone-400 mt-4 tracking-widest uppercase">Version 1.7</p>
+                <p class="text-center text-xs font-bold text-stone-400 mt-4 tracking-widest uppercase">Version 1.8</p>
             </div>
         </section>
     </main>
