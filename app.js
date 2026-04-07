@@ -1,4 +1,4 @@
-// Version: 1.14 | Date: April 2026
+// Version: 1.15 | Date: April 2026
 const db = localforage.createInstance({ name: "DNL_DB" });
 
 let currentPhotoData = null;
@@ -6,7 +6,37 @@ let currentSignatureData = null;
 let signaturePad = null;
 let appLogoBase64 = null; 
 
-// --- YOUR PROVIDED THEME ENGINE ---
+// --- NEW: SYNC UPDATES ENGINE ---
+async function syncAppUpdates(event) {
+    const btn = event.currentTarget;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Syncing...';
+    
+    try {
+        // 1. Force Service Worker to update
+        if ('serviceWorker' in navigator) {
+            const registration = await navigator.serviceWorker.getRegistration();
+            if (registration) {
+                await registration.update();
+            }
+        }
+        
+        // 2. Clear all visual/file Caches (leaves localForage database alone!)
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+        
+        if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+        
+        // 3. Reload the page to fetch fresh assets from GitHub
+        window.location.reload(true);
+    } catch (error) {
+        console.error('Sync failed:', error);
+        alert("Failed to sync. Please check your internet connection.");
+        btn.innerHTML = originalText;
+    }
+}
+
+// --- THEME ENGINE ---
 function applyTheme(isDark) {
     document.body.classList.toggle('dark-mode', isDark);
     
@@ -44,7 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('sigCanvas');
     signaturePad = new SignaturePad(canvas, { backgroundColor: 'rgb(255, 255, 255)', penColor: '#000000' });
 });
-
 
 // --- VIEW NAVIGATION ---
 function switchTab(tabId) {
@@ -84,7 +113,6 @@ async function preloadLogo() {
     }
 }
 
-// --- PRICING MODEL TOGGLE ---
 function togglePricingModel() {
     const model = document.getElementById('pricingModel').value;
     if(model === 'fixed') {
@@ -148,7 +176,6 @@ function saveSignature() {
     closeSignature();
 }
 
-// --- DYNAMIC CATALOG (DB DRIVEN) ---
 const defaultCatalogItems = [
     { name: "2x4 Timber (2.4m)", cost: 5.50, icon: "🪵" },
     { name: "Sheet MDF (12mm)", cost: 18.00, icon: "🟫" },
@@ -219,7 +246,6 @@ function selectCatalogItem(name, cost) {
     if (navigator.vibrate) navigator.vibrate([20]); 
 }
 
-// Settings & Address Book
 async function loadSettings() {
     const settings = await db.getItem('dnl_settings');
     if(settings) {
@@ -342,7 +368,6 @@ function clearQuoteForm() {
     if (navigator.vibrate) navigator.vibrate([20, 20]);
 }
 
-// --- SAVE & GENERATE ---
 async function saveAndGenerate() {
     const name = document.getElementById('custName').value;
     if (!name) {
@@ -415,7 +440,6 @@ async function saveAndGenerate() {
     }, 150);
 }
 
-// --- DASHBOARD ---
 async function updateStatus(id, newStatus) {
     const quote = await db.getItem(id);
     const oldStatus = quote.status;
@@ -504,15 +528,12 @@ async function clearDatabase() {
     }
 }
 
-// --- PDF GENERATOR (UPDATED FOR FIXED PRICE & ADDRESS) ---
 async function generatePDF(data, type = 'QUOTE', triggerNativeShare = false) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     const brandDark = [74, 55, 40]; 
     
-    if (appLogoBase64) {
-        doc.addImage(appLogoBase64, 'PNG', 20, 10, 32, 32); 
-    }
+    if (appLogoBase64) { doc.addImage(appLogoBase64, 'PNG', 20, 10, 32, 32); }
     
     doc.setTextColor(...brandDark);
     doc.setFontSize(22);
@@ -560,12 +581,7 @@ async function generatePDF(data, type = 'QUOTE', triggerNativeShare = false) {
     let infoY = 71;
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    
-    // Add Address to PDF if it exists
-    if(data.address) {
-        doc.text(data.address, 20, infoY, { maxWidth: 90 });
-        infoY += 6;
-    }
+    if(data.address) { doc.text(data.address, 20, infoY, { maxWidth: 90 }); infoY += 6; }
     doc.text(data.description, 20, infoY, { maxWidth: 90 });
 
     doc.setDrawColor(200, 200, 200);
@@ -579,7 +595,6 @@ async function generatePDF(data, type = 'QUOTE', triggerNativeShare = false) {
     doc.setFont("helvetica", "normal");
     
     if (data.pricingModel === 'fixed') {
-        // Fixed Model Rendering
         if (data.fixedData.matCost > 0 || data.fixedData.matDesc) {
             doc.text(data.fixedData.matDesc || 'Materials', 23, y);
             doc.text(`£${data.fixedData.matCost.toFixed(2)}`, 170, y);
@@ -591,7 +606,6 @@ async function generatePDF(data, type = 'QUOTE', triggerNativeShare = false) {
             y += 8;
         }
     } else {
-        // Breakdown Model Rendering
         if (data.breakdown.materialsList && data.breakdown.materialsList.length > 0) {
             data.breakdown.materialsList.forEach(m => {
                 doc.text(`${m.qty ? m.qty + ' x ' : ''}${m.desc || 'Material'}`, 23, y);
@@ -606,11 +620,7 @@ async function generatePDF(data, type = 'QUOTE', triggerNativeShare = false) {
         }
     }
 
-    // Extras (Fuel/Misc are shown on both models if they exist)
-    const remainingItems = [
-        ["Fuel & Travel", data.breakdown.fuel],
-        ["Misc. Expenses", data.breakdown.misc]
-    ];
+    const remainingItems = [ ["Fuel & Travel", data.breakdown.fuel], ["Misc. Expenses", data.breakdown.misc] ];
     remainingItems.forEach(item => {
         if (item[1] > 0) { 
             doc.text(item[0], 23, y);
