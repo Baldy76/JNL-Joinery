@@ -1,4 +1,4 @@
-// Version: 1.6 | Date: April 2026
+// Version: 1.7 | Date: April 2026
 const db = localforage.createInstance({ name: "DNL_DB" });
 
 // --- VIEW NAVIGATION ---
@@ -6,12 +6,15 @@ function switchTab(tabId) {
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
     document.getElementById(`view-${tabId}`).classList.add('active');
     
+    // Update tab bar styling
     document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.add('opacity-50');
-        btn.classList.remove('opacity-100', 'text-[#5c4033]');
+        btn.classList.remove('active-tab', 'text-[#4a3728]');
+        btn.classList.add('text-stone-400');
     });
-    event.currentTarget.classList.remove('opacity-50');
-    event.currentTarget.classList.add('opacity-100', 'text-[#5c4033]');
+    event.currentTarget.classList.remove('text-stone-400');
+    if(tabId !== 'new-quote') {
+        event.currentTarget.classList.add('text-[#4a3728]', 'active-tab');
+    }
 
     if(tabId === 'dashboard') loadQuotes();
     
@@ -48,6 +51,8 @@ async function saveSettings() {
         defaultRate: document.getElementById('defaultRate').value
     };
     await db.setItem('dnl_settings', settings);
+    
+    if (navigator.vibrate) navigator.vibrate([30, 50, 30]); // Success haptic
     alert("Settings saved successfully.");
 }
 
@@ -55,11 +60,15 @@ async function saveSettings() {
 function addMaterialRow() {
     const container = document.getElementById('materialsContainer');
     const row = document.createElement('div');
-    row.className = 'flex space-x-2 material-row';
+    row.className = 'flex space-x-2 material-row items-center';
     row.innerHTML = `
-        <input type="text" class="ios-input w-16 mat-qty" placeholder="Qty">
-        <input type="text" class="ios-input flex-1 mat-desc" placeholder="Item (e.g. Posts)">
-        <input type="number" class="ios-input w-24 mat-cost calc-trigger" placeholder="Cost £">
+        <i class="fa-solid fa-box text-stone-300 text-sm"></i>
+        <input type="text" class="ios-input w-16 mat-qty text-center p-2" placeholder="Qty">
+        <input type="text" class="ios-input flex-1 mat-desc p-2" placeholder="Item name">
+        <div class="relative w-24">
+            <i class="fa-solid fa-sterling-sign absolute left-3 top-1/2 transform -translate-y-1/2 text-stone-400 text-xs"></i>
+            <input type="number" class="ios-input w-full mat-cost calc-trigger pl-6 p-2" placeholder="0.00">
+        </div>
     `;
     container.appendChild(row);
     bindCalcTriggers();
@@ -73,7 +82,7 @@ function bindCalcTriggers() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-    for(let i=0; i<5; i++) { addMaterialRow(); }
+    for(let i=0; i<3; i++) { addMaterialRow(); } // Start with 3 to look cleaner
     loadSettings();
 });
 
@@ -104,7 +113,10 @@ async function saveAndGenerate() {
     const deposit = parseFloat(document.getElementById('quoteDeposit').value) || 0;
     const paymentMethod = document.getElementById('quotePaymentMethod').value;
 
-    if (!name) return alert("Please enter a customer name.");
+    if (!name) {
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]); // Error haptic
+        return alert("Please enter a customer name.");
+    }
 
     const materialsList = [];
     let matTotalCost = 0;
@@ -128,7 +140,7 @@ async function saveAndGenerate() {
         date: new Date().toLocaleDateString(),
         customer: name,
         description: desc,
-        status: 'Sent', // Default to Sent when generated
+        status: 'Sent', 
         breakdown: {
             materialsList: materialsList,
             materials: matTotalCost,
@@ -153,7 +165,7 @@ async function saveAndGenerate() {
     }
     
     calculateTotal();
-    generatePDF(quoteData, 'QUOTE'); // Initially generate a Quote
+    generatePDF(quoteData, 'QUOTE');
     switchTab('dashboard');
 }
 
@@ -162,7 +174,7 @@ async function updateStatus(id, newStatus) {
     const quote = await db.getItem(id);
     quote.status = newStatus;
     await db.setItem(id, quote);
-    loadQuotes(); // Refresh to update colors
+    loadQuotes(); 
 }
 
 async function loadQuotes() {
@@ -173,16 +185,30 @@ async function loadQuotes() {
     const quoteKeys = keys.filter(k => k !== 'dnl_settings');
 
     if (quoteKeys.length === 0) {
-        list.innerHTML = '<p class="text-gray-400 text-center mt-10">No quotes saved yet.</p>';
+        list.innerHTML = `
+            <div class="text-center mt-16 text-stone-400">
+                <i class="fa-solid fa-folder-open text-6xl mb-4 opacity-50"></i>
+                <p class="font-bold">No jobs yet.</p>
+                <p class="text-sm">Tap the + button to create your first quote.</p>
+            </div>`;
         return;
     }
 
-    const getStatusColor = (status) => {
+    const getStatusStyle = (status) => {
         switch(status) {
-            case 'Accepted': return 'bg-green-100 text-green-800 border-green-200';
-            case 'Paid': return 'bg-gray-200 text-gray-800 border-gray-300';
+            case 'Accepted': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+            case 'Paid': return 'bg-stone-200 text-stone-600 border-stone-300';
             case 'Sent': return 'bg-blue-100 text-blue-800 border-blue-200';
-            default: return 'bg-yellow-100 text-yellow-800 border-yellow-200'; // Draft
+            default: return 'bg-amber-100 text-amber-800 border-amber-200'; 
+        }
+    };
+
+    const getStatusIcon = (status) => {
+        switch(status) {
+            case 'Accepted': return 'fa-check-circle text-emerald-500';
+            case 'Paid': return 'fa-sack-dollar text-stone-500';
+            case 'Sent': return 'fa-paper-plane text-blue-500';
+            default: return 'fa-pen-ruler text-amber-500'; 
         }
     };
 
@@ -191,26 +217,31 @@ async function loadQuotes() {
         const status = quote.status || 'Draft';
         
         const card = document.createElement('div');
-        card.className = "bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col";
+        card.className = "bg-white p-5 rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-stone-100 flex flex-col relative overflow-hidden transition-all";
+        
+        // Visual indicator strip
+        const stripColor = status === 'Paid' ? 'bg-stone-300' : (status === 'Accepted' ? 'bg-emerald-500' : (status === 'Sent' ? 'bg-blue-500' : 'bg-amber-400'));
+        
         card.innerHTML = `
-            <div class="flex justify-between items-start mb-3">
+            <div class="absolute left-0 top-0 bottom-0 w-1.5 ${stripColor}"></div>
+            <div class="flex justify-between items-start mb-4 pl-2">
                 <div>
-                    <h4 class="font-bold text-gray-800">${quote.customer}</h4>
-                    <p class="text-xs text-gray-500">${quote.date} | ${quote.id}</p>
+                    <h4 class="font-black text-lg text-stone-800">${quote.customer}</h4>
+                    <p class="text-xs font-bold text-stone-400 mt-1"><i class="fa-regular fa-calendar mr-1"></i>${quote.date} &nbsp;|&nbsp; <i class="fa-solid fa-hashtag mr-1"></i>${quote.id.replace('DNL-','')}</p>
                 </div>
                 <div class="text-right">
-                    <p class="font-bold text-[#4a3728]">£${quote.total.toFixed(2)}</p>
-                    <select onchange="updateStatus('${quote.id}', this.value)" class="text-xs mt-1 p-1 rounded border outline-none font-semibold ${getStatusColor(status)}">
-                        <option value="Draft" ${status==='Draft'?'selected':''}>🟡 Draft</option>
-                        <option value="Sent" ${status==='Sent'?'selected':''}>🔵 Sent</option>
-                        <option value="Accepted" ${status==='Accepted'?'selected':''}>🟢 Accepted</option>
-                        <option value="Paid" ${status==='Paid'?'selected':''}>💰 Paid</option>
+                    <p class="font-black text-xl text-[#4a3728]">£${quote.total.toFixed(2)}</p>
+                    <select onchange="updateStatus('${quote.id}', this.value)" class="text-xs mt-2 py-1 px-2 rounded-lg border outline-none font-bold ${getStatusStyle(status)} cursor-pointer appearance-none text-center">
+                        <option value="Draft" ${status==='Draft'?'selected':''}>Draft</option>
+                        <option value="Sent" ${status==='Sent'?'selected':''}>Sent</option>
+                        <option value="Accepted" ${status==='Accepted'?'selected':''}>Accepted</option>
+                        <option value="Paid" ${status==='Paid'?'selected':''}>Paid</option>
                     </select>
                 </div>
             </div>
-            <div class="flex space-x-2 border-t border-gray-50 pt-3">
-                <button onclick="reprintPDF('${quote.id}', 'QUOTE')" class="flex-1 text-xs text-blue-700 bg-blue-50 py-2 rounded-lg font-bold border border-blue-100 active:bg-blue-200 transition">📄 Quote</button>
-                <button onclick="reprintPDF('${quote.id}', 'INVOICE')" class="flex-1 text-xs text-green-700 bg-green-50 py-2 rounded-lg font-bold border border-green-100 active:bg-green-200 transition">🧾 Invoice</button>
+            <div class="flex space-x-3 border-t border-stone-100 pt-4 pl-2">
+                <button onclick="reprintPDF('${quote.id}', 'QUOTE')" class="flex-1 text-sm text-blue-700 bg-blue-50/50 hover:bg-blue-100 py-2.5 rounded-xl font-bold border border-blue-100 transform active:scale-95 transition"><i class="fa-solid fa-file-invoice mr-1"></i> Quote</button>
+                <button onclick="reprintPDF('${quote.id}', 'INVOICE')" class="flex-1 text-sm text-emerald-700 bg-emerald-50/50 hover:bg-emerald-100 py-2.5 rounded-xl font-bold border border-emerald-100 transform active:scale-95 transition"><i class="fa-solid fa-receipt mr-1"></i> Invoice</button>
             </div>
         `;
         list.appendChild(card);
@@ -224,151 +255,160 @@ async function reprintPDF(id, type) {
 
 // --- ADMIN ---
 async function clearDatabase() {
-    if(confirm("Are you sure? This will delete all saved quotes from this device.")) {
+    if(confirm("DANGER: Are you sure? This will delete all saved jobs forever!")) {
         const settings = await db.getItem('dnl_settings');
         await db.clear();
         if(settings) await db.setItem('dnl_settings', settings);
         
         loadQuotes();
-        alert("Database cleared (Settings preserved).");
+        if (navigator.vibrate) navigator.vibrate([50, 100, 50, 100]); 
+        alert("Database wiped.");
     }
 }
 
-// --- PDF GENERATOR (Supports Quote & Invoice + T&Cs) ---
+// --- PDF GENERATOR ---
 async function generatePDF(data, type = 'QUOTE') {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     const brandDark = [74, 55, 40]; 
     
-    // Page 1: Main Document
+    // Header Block
     doc.setFillColor(...brandDark);
     doc.rect(0, 0, 210, 35, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
+    doc.setFontSize(24);
     doc.setFont("helvetica", "bold");
-    doc.text("D.N.L JOINERY & FENCING", 20, 22);
+    doc.text("D.N.L JOINERY & FENCING", 20, 23);
 
     doc.setTextColor(0, 0, 0);
-    doc.setFontSize(14);
+    doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
     
-    // Dynamic Title (Quote vs Invoice)
     if(type === 'INVOICE') {
-        doc.text("INVOICE", 150, 45);
+        doc.text("INVOICE", 140, 50);
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
         const dueDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString();
-        doc.text(`REF: ${data.id}`, 150, 52);
-        doc.text(`DATE: ${data.date}`, 150, 57);
-        doc.text(`DUE BY: ${dueDate}`, 150, 62);
+        doc.text(`REF NO: ${data.id}`, 140, 58);
+        doc.text(`DATE: ${data.date}`, 140, 63);
+        doc.text(`DUE BY: ${dueDate}`, 140, 68);
     } else {
-        doc.text("QUOTATION", 150, 45);
+        doc.text("QUOTATION", 140, 50);
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
-        doc.text(`REF: ${data.id}`, 150, 52);
-        doc.text(`DATE: ${data.date}`, 150, 57);
-        doc.text(`VALID UNTIL: ${new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}`, 150, 62); // 30 Day Validity
+        doc.text(`REF NO: ${data.id}`, 140, 58);
+        doc.text(`DATE: ${data.date}`, 140, 63);
+        doc.text(`VALID FOR: 30 Days`, 140, 68); 
     }
 
-    doc.setFontSize(12);
+    // Client Info
+    doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
-    doc.text("PREPARED FOR:", 20, 50);
-    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    doc.text("BILLED TO:", 20, 50);
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(12);
     doc.text(data.customer, 20, 57);
     doc.setFontSize(10);
-    doc.text(data.description, 20, 64, { maxWidth: 100 });
+    doc.setFont("helvetica", "normal");
+    doc.text(data.description, 20, 63, { maxWidth: 90 });
 
+    // Table Header
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.5);
-    doc.line(20, 85, 190, 85);
+    doc.setFillColor(245, 245, 245);
+    doc.rect(20, 80, 170, 10, 'F');
     doc.setFont("helvetica", "bold");
-    doc.text("ITEM DESCRIPTION", 20, 92);
-    doc.text("COST", 170, 92);
-    doc.line(20, 96, 190, 96);
+    doc.text("DESCRIPTION", 23, 87);
+    doc.text("AMOUNT", 170, 87);
 
-    let y = 106;
+    let y = 98;
     doc.setFont("helvetica", "normal");
     
+    // Materials
     if (data.breakdown.materialsList && data.breakdown.materialsList.length > 0) {
         data.breakdown.materialsList.forEach(m => {
             const lineText = `${m.qty ? m.qty + ' x ' : ''}${m.desc || 'Material'}`;
-            doc.text(lineText, 20, y);
+            doc.text(lineText, 23, y);
             if(m.cost > 0) doc.text(`£${m.cost.toFixed(2)}`, 170, y);
-            y += 10;
+            y += 8;
         });
     }
 
+    // Fixed Costs
     const remainingItems = [
         ["Fuel & Travel", data.breakdown.fuel],
         ["Misc. Expenses", data.breakdown.misc],
-        ["Labour", data.breakdown.labour]
+        ["Labour / Installation", data.breakdown.labour]
     ];
 
     remainingItems.forEach(item => {
         if (item[1] > 0) { 
-            doc.text(item[0], 20, y);
+            doc.text(item[0], 23, y);
             doc.text(`£${item[1].toFixed(2)}`, 170, y);
-            y += 10;
+            y += 8;
         }
     });
 
+    // Totals Box
     doc.line(120, y + 5, 190, y + 5);
-    
     y += 15;
     doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
     doc.text("GRAND TOTAL:", 120, y);
     doc.text(`£${data.total.toFixed(2)}`, 170, y);
     
     if (data.deposit && data.deposit > 0) {
         y += 8;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
         doc.text("DEPOSIT REQUIRED:", 120, y);
         doc.text(`£${parseFloat(data.deposit).toFixed(2)}`, 170, y);
         
         y += 8;
         doc.setFont("helvetica", "bold");
         const balance = data.total - parseFloat(data.deposit);
-        doc.text("REMAINING BALANCE:", 120, y);
+        doc.text("BALANCE TO PAY:", 120, y);
         doc.text(`£${balance.toFixed(2)}`, 170, y);
     }
     
-    y += 20;
+    // Payment Box
+    y += 25;
+    doc.setFillColor(250, 250, 250);
+    doc.setDrawColor(220, 220, 220);
+    doc.roundedRect(20, y-5, 170, 35, 3, 3, 'FD');
+    
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
-    doc.text("PAYMENT INSTRUCTIONS:", 20, y);
+    doc.text("PAYMENT INFORMATION", 25, y+2);
     
     doc.setFont("helvetica", "normal");
-    y += 6;
     const method = data.paymentMethod || "Cash";
-    doc.text(`Preferred Payment Method: ${method}`, 20, y);
+    doc.text(`Preferred Method: ${method}`, 25, y+10);
 
     if (method === "Bank Transfer") {
         const settings = await db.getItem('dnl_settings');
         if (settings && settings.bankName) {
-            y += 6;
-            doc.text(`Account Name: ${settings.bankName}`, 20, y);
-            y += 6;
-            doc.text(`Sort Code: ${settings.bankSort}`, 20, y);
-            y += 6;
-            doc.text(`Account No: ${settings.bankAcc}`, 20, y);
+            doc.text(`Account Name: ${settings.bankName}`, 25, y+16);
+            doc.text(`Sort Code: ${settings.bankSort}  |  Acc No: ${settings.bankAcc}`, 25, y+22);
         } else {
-            y += 6;
-            doc.text("Please contact us for bank details.", 20, y);
+            doc.text("Please contact us for bank transfer details.", 25, y+16);
         }
     }
 
     doc.setFontSize(9);
     doc.setFont("helvetica", "italic");
     doc.setTextColor(150, 150, 150);
-    doc.text("Thank you for choosing D.N.L Joinery. We appreciate your business.", 105, 280, null, null, "center");
+    doc.text("Thank you for choosing D.N.L Joinery.", 105, 280, null, null, "center");
 
-    // Page 2: Terms & Conditions (Appended Automatically)
+    // Page 2: Terms
     doc.addPage();
     doc.setFillColor(...brandDark);
     doc.rect(0, 0, 210, 20, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("STANDARD TERMS & CONDITIONS", 20, 13);
+    doc.text("TERMS & CONDITIONS", 20, 13);
 
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
@@ -399,7 +439,7 @@ async function generatePDF(data, type = 'QUOTE') {
     terms.forEach(line => {
         if (line.match(/^\d\./)) {
             doc.setFont("helvetica", "bold");
-            tcY += 2; // Extra space before headings
+            tcY += 2; 
         } else {
             doc.setFont("helvetica", "normal");
         }
@@ -407,12 +447,7 @@ async function generatePDF(data, type = 'QUOTE') {
         tcY += 6;
     });
 
-    // Trigger Haptic Feedback (Phone vibration) before saving
-    if (navigator.vibrate) {
-        navigator.vibrate([50]); 
-    }
-
-    // Save File
+    if (navigator.vibrate) navigator.vibrate([40, 50, 40]); 
     const prefix = type === 'INVOICE' ? 'Invoice' : 'Quote';
     doc.save(`DNL_${prefix}_${data.customer.replace(/\s+/g, '_')}.pdf`);
 }
