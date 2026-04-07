@@ -40,7 +40,7 @@
         :root {
             --bg: #f2f2f7;        
             --card: #ffffff;      
-            --text: #1f2937; /* Slightly softened from pure black for better UX */     
+            --text: #1f2937; 
             --ios-grey: #e9e9eb;  
         }
         body.dark-mode { 
@@ -91,7 +91,6 @@
             color: var(--text); 
         }
 
-        /* Standard App Styles utilizing the new variables */
         .ios-input { background: var(--card); border: 2px solid var(--ios-grey); border-radius: 12px; padding: 14px; width: 100%; font-size: 15px; font-weight: 500; color: var(--text); outline: none; transition: all 0.2s; }
         .ios-input:focus { border-color: #f59e0b; box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.15); }
         .view-section { display: none; }
@@ -345,6 +344,14 @@
             </div>
 
             <div class="bg-themeCard p-5 rounded-3xl shadow-sm border border-themeBorder space-y-4 mb-6 transition-colors">
+                <h3 class="font-black text-themeText text-lg border-b border-themeBorder pb-2 flex items-center"><i class="fa-solid fa-arrows-rotate text-blue-500 mr-2"></i>App Maintenance</h3>
+                <p class="text-xs font-bold text-gray-400 mb-2">Force the app to check for new updates and refresh.</p>
+                <button id="syncBtn" onclick="syncAppUpdates(event)" class="w-full bg-blue-500 text-white font-black py-4 rounded-xl transform active:scale-95 transition mt-2 shadow-sm">
+                    Sync PWA Updates
+                </button>
+            </div>
+
+            <div class="bg-themeCard p-5 rounded-3xl shadow-sm border border-themeBorder space-y-4 mb-6 transition-colors">
                 <h3 class="font-black text-themeText text-lg border-b border-themeBorder pb-2">Defaults</h3>
                 <div class="flex space-x-4">
                     <div class="flex-1">
@@ -390,12 +397,12 @@
                 </button>
             </div>
 
-            <div class="bg-red-900/10 p-5 rounded-3xl shadow-sm border border-red-500/20 space-y-4">
+            <div class="bg-red-900/10 p-5 rounded-3xl shadow-sm border border-red-500/20 space-y-4 mb-8">
                 <h3 class="font-black text-red-500 text-lg flex items-center"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Danger Zone</h3>
                 <button onclick="clearDatabase()" class="w-full bg-red-500 text-white font-black py-4 rounded-xl transform active:scale-95 transition">
                     Wipe All Data
                 </button>
-                <p class="text-center text-xs font-black text-red-400 mt-2 tracking-widest uppercase">Version 1.14</p>
+                <p class="text-center text-xs font-black text-red-400 mt-2 tracking-widest uppercase">Version 1.15</p>
             </div>
         </section>
     </main>
