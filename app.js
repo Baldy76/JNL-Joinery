@@ -1,4 +1,4 @@
-// Version: 1.4 | Date: April 2026
+// Version: 1.6 | Date: April 2026
 const db = localforage.createInstance({ name: "DNL_DB" });
 
 // --- VIEW NAVIGATION ---
@@ -14,6 +14,15 @@ function switchTab(tabId) {
     event.currentTarget.classList.add('opacity-100', 'text-[#5c4033]');
 
     if(tabId === 'dashboard') loadQuotes();
+    
+    if(tabId === 'new-quote') {
+        db.getItem('dnl_settings').then(settings => {
+            if(settings && settings.defaultRate && !document.getElementById('labourRate').value) {
+                document.getElementById('labourRate').value = settings.defaultRate;
+                calculateTotal();
+            }
+        });
+    }
 }
 
 // --- SETTINGS (ADMIN) ---
@@ -23,6 +32,11 @@ async function loadSettings() {
         document.getElementById('bankName').value = settings.bankName || '';
         document.getElementById('bankSort').value = settings.bankSort || '';
         document.getElementById('bankAcc').value = settings.bankAcc || '';
+        document.getElementById('defaultRate').value = settings.defaultRate || '';
+        
+        if(!document.getElementById('labourRate').value) {
+            document.getElementById('labourRate').value = settings.defaultRate || '';
+        }
     }
 }
 
@@ -30,10 +44,11 @@ async function saveSettings() {
     const settings = {
         bankName: document.getElementById('bankName').value,
         bankSort: document.getElementById('bankSort').value,
-        bankAcc: document.getElementById('bankAcc').value
+        bankAcc: document.getElementById('bankAcc').value,
+        defaultRate: document.getElementById('defaultRate').value
     };
     await db.setItem('dnl_settings', settings);
-    alert("Bank details saved successfully.");
+    alert("Settings saved successfully.");
 }
 
 // --- DYNAMIC MATERIALS LIST ---
@@ -72,7 +87,6 @@ function calculateTotal() {
     const fuel = parseFloat(document.getElementById('costFuel').value) || 0;
     const misc = parseFloat(document.getElementById('costMisc').value) || 0;
     
-    // Calculate Labour dynamically
     const hours = parseFloat(document.getElementById('labourHours').value) || 0;
     const rate = parseFloat(document.getElementById('labourRate').value) || 0;
     const labTotal = hours * rate;
@@ -114,12 +128,13 @@ async function saveAndGenerate() {
         date: new Date().toLocaleDateString(),
         customer: name,
         description: desc,
+        status: 'Sent', // Default to Sent when generated
         breakdown: {
             materialsList: materialsList,
             materials: matTotalCost,
             fuel: parseFloat(document.getElementById('costFuel').value) || 0,
             misc: parseFloat(document.getElementById('costMisc').value) || 0,
-            labour: labTotal, // Kept for backwards compatibility
+            labour: labTotal,
             labourHours: hours,
             labourRate: rate
         },
@@ -130,14 +145,26 @@ async function saveAndGenerate() {
 
     await db.setItem(quoteData.id, quoteData);
     
-    document.querySelectorAll('input:not(#bankName, #bankSort, #bankAcc), textarea').forEach(el => el.value = '');
-    calculateTotal();
+    document.querySelectorAll('input:not(#bankName, #bankSort, #bankAcc, #defaultRate), textarea').forEach(el => el.value = '');
     
-    generatePDF(quoteData);
+    const settings = await db.getItem('dnl_settings');
+    if(settings && settings.defaultRate) {
+        document.getElementById('labourRate').value = settings.defaultRate;
+    }
+    
+    calculateTotal();
+    generatePDF(quoteData, 'QUOTE'); // Initially generate a Quote
     switchTab('dashboard');
 }
 
-// --- DASHBOARD ---
+// --- DASHBOARD & STATUS MANAGEMENT ---
+async function updateStatus(id, newStatus) {
+    const quote = await db.getItem(id);
+    quote.status = newStatus;
+    await db.setItem(id, quote);
+    loadQuotes(); // Refresh to update colors
+}
+
 async function loadQuotes() {
     const list = document.getElementById('quoteList');
     list.innerHTML = '';
@@ -150,28 +177,49 @@ async function loadQuotes() {
         return;
     }
 
-    // Reverse the array so the newest quotes appear at the top
+    const getStatusColor = (status) => {
+        switch(status) {
+            case 'Accepted': return 'bg-green-100 text-green-800 border-green-200';
+            case 'Paid': return 'bg-gray-200 text-gray-800 border-gray-300';
+            case 'Sent': return 'bg-blue-100 text-blue-800 border-blue-200';
+            default: return 'bg-yellow-100 text-yellow-800 border-yellow-200'; // Draft
+        }
+    };
+
     for (let key of quoteKeys.reverse()) {
         const quote = await db.getItem(key);
+        const status = quote.status || 'Draft';
+        
         const card = document.createElement('div');
-        card.className = "bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center";
+        card.className = "bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col";
         card.innerHTML = `
-            <div>
-                <h4 class="font-bold text-gray-800">${quote.customer}</h4>
-                <p class="text-xs text-gray-500">${quote.date} | ${quote.id}</p>
+            <div class="flex justify-between items-start mb-3">
+                <div>
+                    <h4 class="font-bold text-gray-800">${quote.customer}</h4>
+                    <p class="text-xs text-gray-500">${quote.date} | ${quote.id}</p>
+                </div>
+                <div class="text-right">
+                    <p class="font-bold text-[#4a3728]">£${quote.total.toFixed(2)}</p>
+                    <select onchange="updateStatus('${quote.id}', this.value)" class="text-xs mt-1 p-1 rounded border outline-none font-semibold ${getStatusColor(status)}">
+                        <option value="Draft" ${status==='Draft'?'selected':''}>🟡 Draft</option>
+                        <option value="Sent" ${status==='Sent'?'selected':''}>🔵 Sent</option>
+                        <option value="Accepted" ${status==='Accepted'?'selected':''}>🟢 Accepted</option>
+                        <option value="Paid" ${status==='Paid'?'selected':''}>💰 Paid</option>
+                    </select>
+                </div>
             </div>
-            <div class="text-right">
-                <p class="font-bold text-[#4a3728]">£${quote.total.toFixed(2)}</p>
-                <button onclick="reprintPDF('${quote.id}')" class="text-xs text-blue-500 mt-1">Download PDF</button>
+            <div class="flex space-x-2 border-t border-gray-50 pt-3">
+                <button onclick="reprintPDF('${quote.id}', 'QUOTE')" class="flex-1 text-xs text-blue-700 bg-blue-50 py-2 rounded-lg font-bold border border-blue-100 active:bg-blue-200 transition">📄 Quote</button>
+                <button onclick="reprintPDF('${quote.id}', 'INVOICE')" class="flex-1 text-xs text-green-700 bg-green-50 py-2 rounded-lg font-bold border border-green-100 active:bg-green-200 transition">🧾 Invoice</button>
             </div>
         `;
         list.appendChild(card);
     }
 }
 
-async function reprintPDF(id) {
+async function reprintPDF(id, type) {
     const quote = await db.getItem(id);
-    generatePDF(quote);
+    generatePDF(quote, type);
 }
 
 // --- ADMIN ---
@@ -182,16 +230,17 @@ async function clearDatabase() {
         if(settings) await db.setItem('dnl_settings', settings);
         
         loadQuotes();
-        alert("Database cleared (Bank details preserved).");
+        alert("Database cleared (Settings preserved).");
     }
 }
 
-// --- PDF GENERATOR ---
-async function generatePDF(data) {
+// --- PDF GENERATOR (Supports Quote & Invoice + T&Cs) ---
+async function generatePDF(data, type = 'QUOTE') {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     const brandDark = [74, 55, 40]; 
     
+    // Page 1: Main Document
     doc.setFillColor(...brandDark);
     doc.rect(0, 0, 210, 35, 'F');
     doc.setTextColor(255, 255, 255);
@@ -200,10 +249,26 @@ async function generatePDF(data) {
     doc.text("D.N.L JOINERY & FENCING", 20, 22);
 
     doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`QUOTE REF: ${data.id}`, 150, 50);
-    doc.text(`DATE: ${data.date}`, 150, 55);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    
+    // Dynamic Title (Quote vs Invoice)
+    if(type === 'INVOICE') {
+        doc.text("INVOICE", 150, 45);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        const dueDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString();
+        doc.text(`REF: ${data.id}`, 150, 52);
+        doc.text(`DATE: ${data.date}`, 150, 57);
+        doc.text(`DUE BY: ${dueDate}`, 150, 62);
+    } else {
+        doc.text("QUOTATION", 150, 45);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`REF: ${data.id}`, 150, 52);
+        doc.text(`DATE: ${data.date}`, 150, 57);
+        doc.text(`VALID UNTIL: ${new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}`, 150, 62); // 30 Day Validity
+    }
 
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
@@ -236,7 +301,7 @@ async function generatePDF(data) {
     const remainingItems = [
         ["Fuel & Travel", data.breakdown.fuel],
         ["Misc. Expenses", data.breakdown.misc],
-        ["Labour", data.breakdown.labour] // Just prints the total calculated figure
+        ["Labour", data.breakdown.labour]
     ];
 
     remainingItems.forEach(item => {
@@ -249,7 +314,6 @@ async function generatePDF(data) {
 
     doc.line(120, y + 5, 190, y + 5);
     
-    // --- FINANCIAL SUMMARY ---
     y += 15;
     doc.setFontSize(12);
     doc.text("GRAND TOTAL:", 120, y);
@@ -267,7 +331,6 @@ async function generatePDF(data) {
         doc.text(`£${balance.toFixed(2)}`, 170, y);
     }
     
-    // --- PAYMENT INSTRUCTIONS ---
     y += 20;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
@@ -298,5 +361,58 @@ async function generatePDF(data) {
     doc.setTextColor(150, 150, 150);
     doc.text("Thank you for choosing D.N.L Joinery. We appreciate your business.", 105, 280, null, null, "center");
 
-    doc.save(`DNL_Quote_${data.customer.replace(/\s+/g, '_')}.pdf`);
+    // Page 2: Terms & Conditions (Appended Automatically)
+    doc.addPage();
+    doc.setFillColor(...brandDark);
+    doc.rect(0, 0, 210, 20, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("STANDARD TERMS & CONDITIONS", 20, 13);
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    let tcY = 35;
+    
+    const terms = [
+        "1. Validity & Acceptance",
+        "This quote is valid for 30 days from the date of issue. Acceptance of this quote constitutes agreement",
+        "to these terms. Prices of materials may be subject to fluctuation beyond the 30-day period.",
+        "",
+        "2. Natural Materials",
+        "Timber is a natural product and is subject to movement, shrinking, and cracking due to environmental",
+        "changes (heat, humidity). D.N.L Joinery accepts no liability for natural timber behaviors once installed.",
+        "",
+        "3. Site Preparation",
+        "The working area must be cleared of personal items, furniture, and hazards prior to arrival.",
+        "Delays caused by site unpreparedness may incur additional hourly labour charges.",
+        "",
+        "4. Ownership of Goods",
+        "All materials, fixtures, and installed goods remain the sole property of D.N.L Joinery until the",
+        "final invoice balance is paid in full. We reserve the right to reclaim unpaid goods.",
+        "",
+        "5. Payment Terms",
+        "Deposits (where stated) must be cleared before materials are ordered or work commences.",
+        "Final balances are strictly due upon completion of the works, unless stated otherwise on the invoice."
+    ];
+
+    terms.forEach(line => {
+        if (line.match(/^\d\./)) {
+            doc.setFont("helvetica", "bold");
+            tcY += 2; // Extra space before headings
+        } else {
+            doc.setFont("helvetica", "normal");
+        }
+        doc.text(line, 20, tcY);
+        tcY += 6;
+    });
+
+    // Trigger Haptic Feedback (Phone vibration) before saving
+    if (navigator.vibrate) {
+        navigator.vibrate([50]); 
+    }
+
+    // Save File
+    const prefix = type === 'INVOICE' ? 'Invoice' : 'Quote';
+    doc.save(`DNL_${prefix}_${data.customer.replace(/\s+/g, '_')}.pdf`);
 }
