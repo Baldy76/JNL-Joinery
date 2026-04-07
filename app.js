@@ -1,34 +1,38 @@
-// Version: 1.7 | Date: April 2026
+// Version: 1.8 | Date: April 2026
 const db = localforage.createInstance({ name: "DNL_DB" });
 
-// --- VIEW NAVIGATION ---
+// --- VIEW NAVIGATION & INITIALIZATION ---
 function switchTab(tabId) {
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
     document.getElementById(`view-${tabId}`).classList.add('active');
     
-    // Update tab bar styling
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active-tab', 'text-[#4a3728]');
         btn.classList.add('text-stone-400');
     });
     event.currentTarget.classList.remove('text-stone-400');
-    if(tabId !== 'new-quote') {
-        event.currentTarget.classList.add('text-[#4a3728]', 'active-tab');
-    }
+    if(tabId !== 'new-quote') event.currentTarget.classList.add('text-[#4a3728]', 'active-tab');
 
     if(tabId === 'dashboard') loadQuotes();
     
     if(tabId === 'new-quote') {
         db.getItem('dnl_settings').then(settings => {
-            if(settings && settings.defaultRate && !document.getElementById('labourRate').value) {
-                document.getElementById('labourRate').value = settings.defaultRate;
+            if(settings) {
+                if(!document.getElementById('labourRate').value) document.getElementById('labourRate').value = settings.defaultRate || '';
+                if(!document.getElementById('materialMarkup').value) document.getElementById('materialMarkup').value = settings.defaultMarkup || 0;
                 calculateTotal();
             }
         });
+        loadAddressBook();
     }
 }
 
-// --- SETTINGS (ADMIN) ---
+window.addEventListener('DOMContentLoaded', () => {
+    for(let i=0; i<3; i++) { addMaterialRow(); } 
+    loadSettings();
+});
+
+// --- SETTINGS ---
 async function loadSettings() {
     const settings = await db.getItem('dnl_settings');
     if(settings) {
@@ -36,10 +40,10 @@ async function loadSettings() {
         document.getElementById('bankSort').value = settings.bankSort || '';
         document.getElementById('bankAcc').value = settings.bankAcc || '';
         document.getElementById('defaultRate').value = settings.defaultRate || '';
+        document.getElementById('defaultMarkup').value = settings.defaultMarkup || '';
         
-        if(!document.getElementById('labourRate').value) {
-            document.getElementById('labourRate').value = settings.defaultRate || '';
-        }
+        if(!document.getElementById('labourRate').value) document.getElementById('labourRate').value = settings.defaultRate || '';
+        if(!document.getElementById('materialMarkup').value) document.getElementById('materialMarkup').value = settings.defaultMarkup || 0;
     }
 }
 
@@ -48,15 +52,42 @@ async function saveSettings() {
         bankName: document.getElementById('bankName').value,
         bankSort: document.getElementById('bankSort').value,
         bankAcc: document.getElementById('bankAcc').value,
-        defaultRate: document.getElementById('defaultRate').value
+        defaultRate: document.getElementById('defaultRate').value,
+        defaultMarkup: document.getElementById('defaultMarkup').value
     };
     await db.setItem('dnl_settings', settings);
-    
-    if (navigator.vibrate) navigator.vibrate([30, 50, 30]); // Success haptic
+    if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
     alert("Settings saved successfully.");
 }
 
-// --- DYNAMIC MATERIALS LIST ---
+// --- ADDRESS BOOK ---
+async function loadAddressBook() {
+    const clients = await db.getItem('dnl_clients') || {};
+    const dataList = document.getElementById('clientList');
+    dataList.innerHTML = '';
+    Object.keys(clients).forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        dataList.appendChild(option);
+    });
+}
+
+async function fillClientDetails() {
+    const name = document.getElementById('custName').value;
+    const clients = await db.getItem('dnl_clients') || {};
+    if(clients[name]) {
+        document.getElementById('custPhone').value = clients[name].phone || '';
+        document.getElementById('custEmail').value = clients[name].email || '';
+    }
+}
+
+async function saveToAddressBook(name, phone, email) {
+    const clients = await db.getItem('dnl_clients') || {};
+    clients[name] = { phone: phone, email: email };
+    await db.setItem('dnl_clients', clients);
+}
+
+// --- DYNAMIC MATERIALS ---
 function addMaterialRow() {
     const container = document.getElementById('materialsContainer');
     const row = document.createElement('div');
@@ -81,21 +112,18 @@ function bindCalcTriggers() {
     });
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-    for(let i=0; i<3; i++) { addMaterialRow(); } // Start with 3 to look cleaner
-    loadSettings();
-});
-
-// --- CALCULATIONS ---
+// --- CALCULATIONS (WITH MARKUP) ---
 function calculateTotal() {
-    let matTotal = 0;
+    let rawMatTotal = 0;
     document.querySelectorAll('.mat-cost').forEach(input => {
-        matTotal += parseFloat(input.value) || 0;
+        rawMatTotal += parseFloat(input.value) || 0;
     });
+    
+    const markupPct = parseFloat(document.getElementById('materialMarkup').value) || 0;
+    const matTotal = rawMatTotal * (1 + (markupPct / 100)); // Apply markup to materials
     
     const fuel = parseFloat(document.getElementById('costFuel').value) || 0;
     const misc = parseFloat(document.getElementById('costMisc').value) || 0;
-    
     const hours = parseFloat(document.getElementById('labourHours').value) || 0;
     const rate = parseFloat(document.getElementById('labourRate').value) || 0;
     const labTotal = hours * rate;
@@ -105,40 +133,48 @@ function calculateTotal() {
     return total;
 }
 
-// --- SAVE & PDF LOGIC ---
+// --- SAVE LOGIC ---
 async function saveAndGenerate() {
     const name = document.getElementById('custName').value;
+    const phone = document.getElementById('custPhone').value;
+    const email = document.getElementById('custEmail').value;
     const desc = document.getElementById('jobDesc').value;
+    const markupPct = parseFloat(document.getElementById('materialMarkup').value) || 0;
     const total = calculateTotal();
-    const deposit = parseFloat(document.getElementById('quoteDeposit').value) || 0;
-    const paymentMethod = document.getElementById('quotePaymentMethod').value;
 
     if (!name) {
-        if (navigator.vibrate) navigator.vibrate([100, 50, 100]); // Error haptic
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
         return alert("Please enter a customer name.");
     }
+
+    // Save to address book
+    await saveToAddressBook(name, phone, email);
 
     const materialsList = [];
     let matTotalCost = 0;
     document.querySelectorAll('.material-row').forEach(row => {
         const qty = row.querySelector('.mat-qty').value;
         const mDesc = row.querySelector('.mat-desc').value;
-        const cost = parseFloat(row.querySelector('.mat-cost').value) || 0;
+        const rawCost = parseFloat(row.querySelector('.mat-cost').value) || 0;
         
-        if (qty || mDesc || cost) {
-            materialsList.push({ qty, desc: mDesc, cost });
-            matTotalCost += cost;
+        // Bake the markup directly into the saved cost so the customer doesn't see "Markup"
+        const markedUpCost = rawCost * (1 + (markupPct / 100));
+        
+        if (qty || mDesc || rawCost) {
+            materialsList.push({ qty, desc: mDesc, cost: markedUpCost });
+            matTotalCost += markedUpCost;
         }
     });
 
     const hours = parseFloat(document.getElementById('labourHours').value) || 0;
     const rate = parseFloat(document.getElementById('labourRate').value) || 0;
-    const labTotal = hours * rate;
 
     const quoteData = {
         id: `DNL-${Math.floor(Math.random() * 10000)}`,
         date: new Date().toLocaleDateString(),
         customer: name,
+        phone: phone,
+        email: email,
         description: desc,
         status: 'Sent', 
         breakdown: {
@@ -146,30 +182,24 @@ async function saveAndGenerate() {
             materials: matTotalCost,
             fuel: parseFloat(document.getElementById('costFuel').value) || 0,
             misc: parseFloat(document.getElementById('costMisc').value) || 0,
-            labour: labTotal,
-            labourHours: hours,
-            labourRate: rate
+            labour: hours * rate,
         },
         total: total,
-        deposit: deposit,
-        paymentMethod: paymentMethod
+        deposit: parseFloat(document.getElementById('quoteDeposit').value) || 0,
+        paymentMethod: document.getElementById('quotePaymentMethod').value
     };
 
     await db.setItem(quoteData.id, quoteData);
     
-    document.querySelectorAll('input:not(#bankName, #bankSort, #bankAcc, #defaultRate), textarea').forEach(el => el.value = '');
+    // Reset Form
+    document.querySelectorAll('input:not(#bankName, #bankSort, #bankAcc, #defaultRate, #defaultMarkup), textarea').forEach(el => el.value = '');
+    loadSettings(); // Restore defaults
     
-    const settings = await db.getItem('dnl_settings');
-    if(settings && settings.defaultRate) {
-        document.getElementById('labourRate').value = settings.defaultRate;
-    }
-    
-    calculateTotal();
-    generatePDF(quoteData, 'QUOTE');
+    generatePDF(quoteData, 'QUOTE', false); // false = Download, don't share natively yet
     switchTab('dashboard');
 }
 
-// --- DASHBOARD & STATUS MANAGEMENT ---
+// --- DASHBOARD & SHARING ---
 async function updateStatus(id, newStatus) {
     const quote = await db.getItem(id);
     quote.status = newStatus;
@@ -181,16 +211,10 @@ async function loadQuotes() {
     const list = document.getElementById('quoteList');
     list.innerHTML = '';
     let keys = await db.keys();
-    
-    const quoteKeys = keys.filter(k => k !== 'dnl_settings');
+    const quoteKeys = keys.filter(k => k !== 'dnl_settings' && k !== 'dnl_clients');
 
     if (quoteKeys.length === 0) {
-        list.innerHTML = `
-            <div class="text-center mt-16 text-stone-400">
-                <i class="fa-solid fa-folder-open text-6xl mb-4 opacity-50"></i>
-                <p class="font-bold">No jobs yet.</p>
-                <p class="text-sm">Tap the + button to create your first quote.</p>
-            </div>`;
+        list.innerHTML = `<div class="text-center mt-16 text-stone-400"><i class="fa-solid fa-folder-open text-6xl mb-4 opacity-50"></i><p class="font-bold">No jobs yet.</p></div>`;
         return;
     }
 
@@ -203,31 +227,20 @@ async function loadQuotes() {
         }
     };
 
-    const getStatusIcon = (status) => {
-        switch(status) {
-            case 'Accepted': return 'fa-check-circle text-emerald-500';
-            case 'Paid': return 'fa-sack-dollar text-stone-500';
-            case 'Sent': return 'fa-paper-plane text-blue-500';
-            default: return 'fa-pen-ruler text-amber-500'; 
-        }
-    };
-
     for (let key of quoteKeys.reverse()) {
         const quote = await db.getItem(key);
         const status = quote.status || 'Draft';
+        const stripColor = status === 'Paid' ? 'bg-stone-300' : (status === 'Accepted' ? 'bg-emerald-500' : (status === 'Sent' ? 'bg-blue-500' : 'bg-amber-400'));
         
         const card = document.createElement('div');
         card.className = "bg-white p-5 rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-stone-100 flex flex-col relative overflow-hidden transition-all";
-        
-        // Visual indicator strip
-        const stripColor = status === 'Paid' ? 'bg-stone-300' : (status === 'Accepted' ? 'bg-emerald-500' : (status === 'Sent' ? 'bg-blue-500' : 'bg-amber-400'));
         
         card.innerHTML = `
             <div class="absolute left-0 top-0 bottom-0 w-1.5 ${stripColor}"></div>
             <div class="flex justify-between items-start mb-4 pl-2">
                 <div>
                     <h4 class="font-black text-lg text-stone-800">${quote.customer}</h4>
-                    <p class="text-xs font-bold text-stone-400 mt-1"><i class="fa-regular fa-calendar mr-1"></i>${quote.date} &nbsp;|&nbsp; <i class="fa-solid fa-hashtag mr-1"></i>${quote.id.replace('DNL-','')}</p>
+                    <p class="text-xs font-bold text-stone-400 mt-1"><i class="fa-regular fa-calendar mr-1"></i>${quote.date} &nbsp;|&nbsp; ${quote.id.replace('DNL-','')}</p>
                 </div>
                 <div class="text-right">
                     <p class="font-black text-xl text-[#4a3728]">£${quote.total.toFixed(2)}</p>
@@ -239,40 +252,56 @@ async function loadQuotes() {
                     </select>
                 </div>
             </div>
-            <div class="flex space-x-3 border-t border-stone-100 pt-4 pl-2">
-                <button onclick="reprintPDF('${quote.id}', 'QUOTE')" class="flex-1 text-sm text-blue-700 bg-blue-50/50 hover:bg-blue-100 py-2.5 rounded-xl font-bold border border-blue-100 transform active:scale-95 transition"><i class="fa-solid fa-file-invoice mr-1"></i> Quote</button>
-                <button onclick="reprintPDF('${quote.id}', 'INVOICE')" class="flex-1 text-sm text-emerald-700 bg-emerald-50/50 hover:bg-emerald-100 py-2.5 rounded-xl font-bold border border-emerald-100 transform active:scale-95 transition"><i class="fa-solid fa-receipt mr-1"></i> Invoice</button>
+            
+            <div class="flex space-x-2 border-t border-stone-100 pt-4 pl-2 mb-3">
+                <button onclick="generatePDF(await db.getItem('${quote.id}'), 'QUOTE', false)" class="flex-1 text-sm text-stone-700 bg-stone-100 hover:bg-stone-200 py-2 rounded-xl font-bold transition"><i class="fa-solid fa-file-arrow-down mr-1"></i> Get Quote</button>
+                <button onclick="generatePDF(await db.getItem('${quote.id}'), 'INVOICE', false)" class="flex-1 text-sm text-stone-700 bg-stone-100 hover:bg-stone-200 py-2 rounded-xl font-bold transition"><i class="fa-solid fa-file-arrow-down mr-1"></i> Get Invoice</button>
+            </div>
+
+            <div class="flex justify-between pl-2 border-t border-stone-50 pt-3">
+                <div class="flex space-x-2">
+                    <button onclick="sendQuickMessage('${quote.id}', 'whatsapp')" class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center hover:bg-green-200 transition"><i class="fa-brands fa-whatsapp text-lg"></i></button>
+                    <button onclick="sendQuickMessage('${quote.id}', 'sms')" class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center hover:bg-blue-200 transition"><i class="fa-solid fa-comment-sms text-lg"></i></button>
+                    <button onclick="sendQuickMessage('${quote.id}', 'email')" class="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center hover:bg-purple-200 transition"><i class="fa-solid fa-envelope text-lg"></i></button>
+                </div>
+                <button onclick="generatePDF(await db.getItem('${quote.id}'), 'QUOTE', true)" class="px-4 h-10 rounded-full bg-[#4a3728] text-white flex items-center justify-center hover:bg-[#5c4033] text-xs font-bold transition shadow-md"><i class="fa-solid fa-share-nodes mr-2"></i> Share PDF</button>
             </div>
         `;
         list.appendChild(card);
     }
 }
 
-async function reprintPDF(id, type) {
+// Quick Messaging Actions
+async function sendQuickMessage(id, platform) {
     const quote = await db.getItem(id);
-    generatePDF(quote, type);
+    const msg = `Hi ${quote.customer}, I have prepared your document for the joinery work (${quote.description}). The total is £${quote.total.toFixed(2)}. I will send the PDF over to you now. Thanks, D.N.L Joinery.`;
+    
+    if (platform === 'whatsapp') {
+        const phone = quote.phone ? quote.phone.replace(/^0/, '+44').replace(/\s/g, '') : '';
+        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+    } else if (platform === 'sms') {
+        window.open(`sms:${quote.phone || ''}?&body=${encodeURIComponent(msg)}`, '_self');
+    } else if (platform === 'email') {
+        window.open(`mailto:${quote.email || ''}?subject=Your Quote from D.N.L Joinery&body=${encodeURIComponent(msg)}`, '_self');
+    }
 }
 
-// --- ADMIN ---
 async function clearDatabase() {
     if(confirm("DANGER: Are you sure? This will delete all saved jobs forever!")) {
         const settings = await db.getItem('dnl_settings');
         await db.clear();
         if(settings) await db.setItem('dnl_settings', settings);
-        
         loadQuotes();
-        if (navigator.vibrate) navigator.vibrate([50, 100, 50, 100]); 
         alert("Database wiped.");
     }
 }
 
-// --- PDF GENERATOR ---
-async function generatePDF(data, type = 'QUOTE') {
+// --- PDF GENERATOR (Updated for Native Sharing) ---
+async function generatePDF(data, type = 'QUOTE', triggerNativeShare = false) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     const brandDark = [74, 55, 40]; 
     
-    // Header Block
     doc.setFillColor(...brandDark);
     doc.rect(0, 0, 210, 35, 'F');
     doc.setTextColor(255, 255, 255);
@@ -301,7 +330,6 @@ async function generatePDF(data, type = 'QUOTE') {
         doc.text(`VALID FOR: 30 Days`, 140, 68); 
     }
 
-    // Client Info
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(100, 100, 100);
@@ -313,7 +341,6 @@ async function generatePDF(data, type = 'QUOTE') {
     doc.setFont("helvetica", "normal");
     doc.text(data.description, 20, 63, { maxWidth: 90 });
 
-    // Table Header
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.5);
     doc.setFillColor(245, 245, 245);
@@ -325,7 +352,6 @@ async function generatePDF(data, type = 'QUOTE') {
     let y = 98;
     doc.setFont("helvetica", "normal");
     
-    // Materials
     if (data.breakdown.materialsList && data.breakdown.materialsList.length > 0) {
         data.breakdown.materialsList.forEach(m => {
             const lineText = `${m.qty ? m.qty + ' x ' : ''}${m.desc || 'Material'}`;
@@ -335,7 +361,6 @@ async function generatePDF(data, type = 'QUOTE') {
         });
     }
 
-    // Fixed Costs
     const remainingItems = [
         ["Fuel & Travel", data.breakdown.fuel],
         ["Misc. Expenses", data.breakdown.misc],
@@ -350,7 +375,6 @@ async function generatePDF(data, type = 'QUOTE') {
         }
     });
 
-    // Totals Box
     doc.line(120, y + 5, 190, y + 5);
     y += 15;
     doc.setFontSize(12);
@@ -372,7 +396,6 @@ async function generatePDF(data, type = 'QUOTE') {
         doc.text(`£${balance.toFixed(2)}`, 170, y);
     }
     
-    // Payment Box
     y += 25;
     doc.setFillColor(250, 250, 250);
     doc.setDrawColor(220, 220, 220);
@@ -401,53 +424,26 @@ async function generatePDF(data, type = 'QUOTE') {
     doc.setTextColor(150, 150, 150);
     doc.text("Thank you for choosing D.N.L Joinery.", 105, 280, null, null, "center");
 
-    // Page 2: Terms
-    doc.addPage();
-    doc.setFillColor(...brandDark);
-    doc.rect(0, 0, 210, 20, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("TERMS & CONDITIONS", 20, 13);
-
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    let tcY = 35;
-    
-    const terms = [
-        "1. Validity & Acceptance",
-        "This quote is valid for 30 days from the date of issue. Acceptance of this quote constitutes agreement",
-        "to these terms. Prices of materials may be subject to fluctuation beyond the 30-day period.",
-        "",
-        "2. Natural Materials",
-        "Timber is a natural product and is subject to movement, shrinking, and cracking due to environmental",
-        "changes (heat, humidity). D.N.L Joinery accepts no liability for natural timber behaviors once installed.",
-        "",
-        "3. Site Preparation",
-        "The working area must be cleared of personal items, furniture, and hazards prior to arrival.",
-        "Delays caused by site unpreparedness may incur additional hourly labour charges.",
-        "",
-        "4. Ownership of Goods",
-        "All materials, fixtures, and installed goods remain the sole property of D.N.L Joinery until the",
-        "final invoice balance is paid in full. We reserve the right to reclaim unpaid goods.",
-        "",
-        "5. Payment Terms",
-        "Deposits (where stated) must be cleared before materials are ordered or work commences.",
-        "Final balances are strictly due upon completion of the works, unless stated otherwise on the invoice."
-    ];
-
-    terms.forEach(line => {
-        if (line.match(/^\d\./)) {
-            doc.setFont("helvetica", "bold");
-            tcY += 2; 
-        } else {
-            doc.setFont("helvetica", "normal");
-        }
-        doc.text(line, 20, tcY);
-        tcY += 6;
-    });
-
-    if (navigator.vibrate) navigator.vibrate([40, 50, 40]); 
     const prefix = type === 'INVOICE' ? 'Invoice' : 'Quote';
-    doc.save(`DNL_${prefix}_${data.customer.replace(/\s+/g, '_')}.pdf`);
+    const filename = `DNL_${prefix}_${data.customer.replace(/\s+/g, '_')}.pdf`;
+
+    if (triggerNativeShare && navigator.canShare) {
+        // Native Share (Attach PDF directly to WhatsApp/Mail via OS)
+        const pdfBlob = doc.output('blob');
+        const file = new File([pdfBlob], filename, { type: 'application/pdf' });
+        try {
+            await navigator.share({
+                title: `${prefix} from D.N.L Joinery`,
+                text: `Please find attached your ${prefix.toLowerCase()} for the recent joinery work.`,
+                files: [file]
+            });
+        } catch (error) {
+            console.log('Share canceled or not supported natively', error);
+            doc.save(filename); // Fallback to download
+        }
+    } else {
+        // Normal Download
+        if (navigator.vibrate) navigator.vibrate([40, 50, 40]); 
+        doc.save(filename);
+    }
 }
