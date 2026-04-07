@@ -1,4 +1,4 @@
-// Version: 1.3 | Date: April 2026
+// Version: 1.4 | Date: April 2026
 const db = localforage.createInstance({ name: "DNL_DB" });
 
 // --- VIEW NAVIGATION ---
@@ -71,9 +71,13 @@ function calculateTotal() {
     
     const fuel = parseFloat(document.getElementById('costFuel').value) || 0;
     const misc = parseFloat(document.getElementById('costMisc').value) || 0;
-    const lab = parseFloat(document.getElementById('costLabour').value) || 0;
     
-    const total = matTotal + fuel + misc + lab;
+    // Calculate Labour dynamically
+    const hours = parseFloat(document.getElementById('labourHours').value) || 0;
+    const rate = parseFloat(document.getElementById('labourRate').value) || 0;
+    const labTotal = hours * rate;
+    
+    const total = matTotal + fuel + misc + labTotal;
     document.getElementById('displayTotal').innerText = `£${total.toFixed(2)}`;
     return total;
 }
@@ -101,6 +105,10 @@ async function saveAndGenerate() {
         }
     });
 
+    const hours = parseFloat(document.getElementById('labourHours').value) || 0;
+    const rate = parseFloat(document.getElementById('labourRate').value) || 0;
+    const labTotal = hours * rate;
+
     const quoteData = {
         id: `DNL-${Math.floor(Math.random() * 10000)}`,
         date: new Date().toLocaleDateString(),
@@ -111,7 +119,9 @@ async function saveAndGenerate() {
             materials: matTotalCost,
             fuel: parseFloat(document.getElementById('costFuel').value) || 0,
             misc: parseFloat(document.getElementById('costMisc').value) || 0,
-            labour: parseFloat(document.getElementById('costLabour').value) || 0
+            labour: labTotal, // Kept for backwards compatibility
+            labourHours: hours,
+            labourRate: rate
         },
         total: total,
         deposit: deposit,
@@ -140,7 +150,8 @@ async function loadQuotes() {
         return;
     }
 
-    for (let key of quoteKeys) {
+    // Reverse the array so the newest quotes appear at the top
+    for (let key of quoteKeys.reverse()) {
         const quote = await db.getItem(key);
         const card = document.createElement('div');
         card.className = "bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center";
@@ -166,7 +177,6 @@ async function reprintPDF(id) {
 // --- ADMIN ---
 async function clearDatabase() {
     if(confirm("Are you sure? This will delete all saved quotes from this device.")) {
-        // Only clear quotes, preserve settings
         const settings = await db.getItem('dnl_settings');
         await db.clear();
         if(settings) await db.setItem('dnl_settings', settings);
@@ -226,7 +236,7 @@ async function generatePDF(data) {
     const remainingItems = [
         ["Fuel & Travel", data.breakdown.fuel],
         ["Misc. Expenses", data.breakdown.misc],
-        ["Labour", data.breakdown.labour]
+        ["Labour", data.breakdown.labour] // Just prints the total calculated figure
     ];
 
     remainingItems.forEach(item => {
