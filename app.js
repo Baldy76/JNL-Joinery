@@ -1,4 +1,4 @@
-// Version: 1.10 | Date: April 2026
+// Version: 1.11 | Date: April 2026
 const db = localforage.createInstance({ name: "DNL_DB" });
 
 let currentPhotoData = null;
@@ -214,6 +214,36 @@ function calculateTotal() {
     return total;
 }
 
+// Clear Form Logic
+function clearQuoteForm() {
+    if(!confirm("Are you sure you want to clear this quote? All unsaved details will be lost.")) return;
+    
+    // Clear standard inputs
+    document.querySelectorAll('#view-new-quote input, #view-new-quote textarea').forEach(el => {
+        el.value = '';
+    });
+    
+    // Clear UI elements
+    document.getElementById('photoPreview').classList.add('hidden');
+    document.getElementById('photoPreview').src = '';
+    currentPhotoData = null;
+    
+    document.getElementById('signaturePreview').classList.add('hidden');
+    document.getElementById('signaturePreview').src = '';
+    currentSignatureData = null;
+    if(signaturePad) signaturePad.clear();
+
+    // Reset materials list to default 3 blanks
+    document.getElementById('materialsContainer').innerHTML = '';
+    for(let i=0; i<3; i++) { addMaterialRow(); } 
+    
+    // Restore default settings (rate & markup)
+    loadSettings(); 
+    calculateTotal();
+    
+    if (navigator.vibrate) navigator.vibrate([20, 20]);
+}
+
 // Save & Create
 async function saveAndGenerate() {
     const name = document.getElementById('custName').value;
@@ -313,7 +343,6 @@ async function loadQuotes() {
 
         const status = quote.status || 'Draft';
         
-        // VIBRANT FINTECH CARDS
         let cardBg = '', iconBg = '', iconColor = '', iconObj = '';
         if(status === 'Paid') { cardBg = 'from-emerald-50 to-white border-emerald-200'; iconBg = 'bg-emerald-500'; iconColor = 'text-white'; iconObj = 'fa-sack-dollar'; }
         else if(status === 'Accepted') { cardBg = 'from-indigo-50 to-white border-indigo-200'; iconBg = 'bg-indigo-500'; iconColor = 'text-white'; iconObj = 'fa-handshake'; }
@@ -378,7 +407,7 @@ async function clearDatabase() {
     }
 }
 
-// PDF Generator (No logic changes required, kept stable from v1.9)
+// PDF Generator
 async function generatePDF(data, type = 'QUOTE', triggerNativeShare = false) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
