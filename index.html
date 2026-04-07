@@ -22,7 +22,6 @@
         .view-section { display: none; }
         .view-section.active { display: block; animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        /* Safe area padding for newer iPhones */
         .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
         .pt-safe { padding-top: env(safe-area-inset-top, 40px); }
     </style>
@@ -38,8 +37,7 @@
         
         <section id="view-dashboard" class="view-section active">
             <h2 class="text-2xl font-bold text-gray-800 mb-4">Recent Quotes</h2>
-            <div id="quoteList" class="space-y-4">
-                </div>
+            <div id="quoteList" class="space-y-4"></div>
         </section>
 
         <section id="view-new-quote" class="view-section">
@@ -97,6 +95,7 @@
                 <button onclick="clearDatabase()" class="w-full bg-red-100 text-red-600 font-bold py-3 rounded-xl active:bg-red-200 transition">
                     Wipe Database (Clear All Quotes)
                 </button>
+                <p class="text-center text-xs text-gray-400 mt-4">App Version: 1.1</p>
             </div>
         </section>
     </main>
@@ -118,7 +117,6 @@
 
     <script src="app.js"></script>
     <script>
-        // Register Service Worker for PWA Offline functionality
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');
         }
