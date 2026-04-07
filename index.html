@@ -6,22 +6,93 @@
     <title>D.N.L Joinery</title>
     
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#fefce8">
+    <meta name="theme-color" content="#f2f2f7" id="theme-meta">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="logo.png">
 
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        themeBg: 'var(--bg)',
+                        themeCard: 'var(--card)',
+                        themeText: 'var(--text)',
+                        themeBorder: 'var(--ios-grey)'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.5/dist/signature_pad.umd.min.js"></script>
 
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
-        .ios-input { background: #ffffff; border: 2px solid #f3f4f6; border-radius: 12px; padding: 14px; width: 100%; font-size: 15px; font-weight: 500; color: #1f2937; outline: none; transition: all 0.2s; box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
+        /* --- YOUR PROVIDED THEME ENGINE --- */
+        :root {
+            --bg: #f2f2f7;        
+            --card: #ffffff;      
+            --text: #1f2937; /* Slightly softened from pure black for better UX */     
+            --ios-grey: #e9e9eb;  
+        }
+        body.dark-mode { 
+            --bg: #000000; 
+            --card: #1c1c1e; 
+            --text: #f3f4f6; 
+            --ios-grey: #39393d; 
+        }
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            transition: background-color 0.3s ease, color 0.3s ease;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* --- THE TOGGLE BUTTON STYLING --- */
+        .theme-segmented-control { 
+            display: flex; 
+            background: var(--ios-grey); 
+            border-radius: 16px; 
+            padding: 4px; 
+            width: 100%; 
+            margin-top: 10px; 
+            box-shadow: inset 0 1px 4px rgba(0,0,0,0.05); 
+        }
+        .segment { 
+            flex: 1; 
+            padding: 12px; 
+            border-radius: 12px; 
+            border: none; 
+            background: transparent; 
+            font-weight: 800; 
+            color: var(--text); 
+            opacity: 0.5; 
+            font-size: 15px; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            gap: 8px; 
+            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1); 
+            cursor: pointer;
+        }
+        .segment.active { 
+            background: var(--card); 
+            opacity: 1; 
+            box-shadow: 0 3px 8px rgba(0,0,0,0.1); 
+            color: var(--text); 
+        }
+
+        /* Standard App Styles utilizing the new variables */
+        .ios-input { background: var(--card); border: 2px solid var(--ios-grey); border-radius: 12px; padding: 14px; width: 100%; font-size: 15px; font-weight: 500; color: var(--text); outline: none; transition: all 0.2s; }
         .ios-input:focus { border-color: #f59e0b; box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.15); }
         .view-section { display: none; }
         .view-section.active { display: block; animation: bounceIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1); }
@@ -35,14 +106,14 @@
         .icon-box { width: 42px; height: 42px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 12px; }
     </style>
 </head>
-<body class="bg-gradient-to-br from-yellow-50 via-stone-50 to-orange-50 h-screen flex flex-col overflow-hidden text-stone-800">
+<body class="h-screen flex flex-col overflow-hidden">
 
-    <header class="bg-white/95 backdrop-blur-md shadow-sm pt-safe pb-4 px-4 flex justify-between items-center z-10 shrink-0 border-b border-stone-200">
+    <header class="bg-themeCard/95 backdrop-blur-md shadow-sm pt-safe pb-4 px-4 flex justify-between items-center z-10 shrink-0 border-b border-themeBorder transition-colors">
         <div class="flex items-center">
             <div class="bg-gradient-to-br from-orange-400 to-amber-600 p-1 rounded-xl shadow-sm mr-3">
                 <img src="logo.png" alt="D.N.L Logo" class="h-10 w-10 object-contain bg-white rounded-lg">
             </div>
-            <h1 class="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#4a3728] to-[#8b5a2b] tracking-wider uppercase">D·N·L Joinery</h1>
+            <h1 class="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#8b5a2b] to-[#b3773b] tracking-wider uppercase">D·N·L Joinery</h1>
         </div>
     </header>
 
@@ -57,34 +128,43 @@
                 </div>
             </div>
             <div class="flex justify-between items-end mb-4 px-1">
-                <h2 class="text-2xl font-black text-stone-800">Recent Jobs</h2>
+                <h2 class="text-2xl font-black text-themeText">Recent Jobs</h2>
             </div>
             <div id="quoteList" class="space-y-4"></div>
         </section>
 
         <section id="view-new-quote" class="view-section">
-            <h2 class="text-2xl font-black text-stone-800 mb-4 flex items-center"><i class="fa-solid fa-wand-magic-sparkles text-amber-500 mr-3"></i>New Document</h2>
+            <h2 class="text-2xl font-black text-themeText mb-4 flex items-center"><i class="fa-solid fa-wand-magic-sparkles text-amber-500 mr-3"></i>New Document</h2>
             
-            <div class="bg-white p-5 rounded-3xl shadow-sm border border-stone-200 mb-6 space-y-4">
+            <div class="bg-themeCard p-5 rounded-3xl shadow-sm border border-themeBorder mb-6 space-y-4 transition-colors">
                 <div class="flex items-center space-x-3">
                     <div class="icon-box bg-blue-100 text-blue-600"><i class="fa-solid fa-user text-lg"></i></div>
                     <div class="flex-1">
-                        <label class="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1 block">Customer Name</label>
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Customer Name</label>
                         <input type="text" id="custName" list="clientList" class="ios-input" placeholder="e.g. John Smith" onchange="fillClientDetails()">
                         <datalist id="clientList"></datalist>
                     </div>
                 </div>
+                
+                <div class="flex items-center space-x-3">
+                    <div class="icon-box bg-rose-100 text-rose-600"><i class="fa-solid fa-house"></i></div>
+                    <div class="flex-1">
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Customer Address</label>
+                        <input type="text" id="custAddress" class="ios-input" placeholder="e.g. 10 High Street, City">
+                    </div>
+                </div>
+
                 <div class="flex items-center space-x-3">
                     <div class="icon-box bg-green-100 text-green-600"><i class="fa-solid fa-phone"></i></div>
                     <div class="flex-1">
-                        <label class="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1 block">Phone</label>
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Phone</label>
                         <input type="tel" id="custPhone" class="ios-input" placeholder="07...">
                     </div>
                 </div>
                 <div class="flex items-center space-x-3">
                     <div class="icon-box bg-purple-100 text-purple-600"><i class="fa-solid fa-at"></i></div>
                     <div class="flex-1">
-                        <label class="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1 block">Email</label>
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Email</label>
                         <input type="email" id="custEmail" class="ios-input" placeholder="email@address.com">
                     </div>
                 </div>
@@ -93,114 +173,148 @@
                     <div class="icon-box bg-orange-100 text-orange-600 mt-5"><i class="fa-solid fa-clipboard-list"></i></div>
                     <div class="flex-1">
                         <div class="flex justify-between items-end mb-1">
-                            <label class="text-[10px] font-black text-stone-400 uppercase tracking-widest">Job Details</label>
+                            <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Job Details</label>
                             <button onclick="startDictation()" class="text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded-full text-xs font-bold transition"><i class="fa-solid fa-microphone mr-1"></i> Dictate</button>
                         </div>
                         <textarea id="jobDesc" class="ios-input" rows="2" placeholder="Describe the work..."></textarea>
                     </div>
                 </div>
                 
-                <div class="pt-4 border-t border-stone-100">
+                <div class="pt-4 border-t border-themeBorder">
                     <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="handlePhotoUpload(event)">
-                    <button onclick="document.getElementById('cameraInput').click()" class="w-full bg-stone-50 text-stone-600 font-black py-4 rounded-2xl active:scale-95 transition flex items-center justify-center border border-stone-200">
-                        <i class="fa-solid fa-camera text-xl text-stone-400 mr-2"></i> Attach Site Photo
+                    <button onclick="document.getElementById('cameraInput').click()" class="w-full bg-themeBorder text-themeText font-black py-4 rounded-2xl active:scale-95 transition flex items-center justify-center">
+                        <i class="fa-solid fa-camera text-xl mr-2"></i> Attach Site Photo
                     </button>
-                    <img id="photoPreview" class="mt-4 rounded-2xl max-h-40 w-full object-cover hidden shadow-sm border border-stone-200">
+                    <img id="photoPreview" class="mt-4 rounded-2xl max-h-40 w-full object-cover hidden shadow-sm border border-themeBorder">
                 </div>
             </div>
 
-            <div class="bg-white p-5 rounded-3xl shadow-sm border border-stone-200 mb-6">
-                <div class="flex justify-between items-center mb-4 bg-amber-50 p-3 rounded-2xl">
-                    <div class="flex items-center text-amber-700 font-black text-lg">
-                        <div class="icon-box bg-white text-amber-500 shadow-sm mr-3"><i class="fa-solid fa-toolbox"></i></div>
-                        Materials
-                    </div>
-                    <button onclick="openCatalog()" class="bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-black shadow-sm active:scale-95"><i class="fa-solid fa-book-open mr-1"></i> Catalog</button>
-                </div>
-                
-                <div class="flex justify-end mb-4 px-2">
-                    <div class="flex items-center bg-stone-50 rounded-xl p-1 border border-stone-200">
-                        <label class="text-[10px] font-black text-stone-500 mx-2 uppercase tracking-widest">Markup %</label>
-                        <input type="number" id="materialMarkup" class="ios-input w-20 py-1.5 px-2 text-center text-sm font-black text-amber-600 bg-white shadow-sm border-none calc-trigger" placeholder="0">
-                    </div>
-                </div>
-                
-                <div id="materialsContainer" class="space-y-3 mb-4"></div>
-                <button onclick="addMaterialRow()" class="w-full text-sm font-black text-amber-700 bg-amber-50 hover:bg-amber-100 py-3 rounded-xl transition active:scale-95 border border-amber-200 flex items-center justify-center">
-                    <i class="fa-solid fa-plus mr-2"></i> Add Custom Row
-                </button>
+            <div class="bg-themeCard p-4 rounded-3xl shadow-sm border border-themeBorder mb-6 transition-colors">
+                <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block text-center">Select Pricing Model</label>
+                <select id="pricingModel" class="ios-input font-bold text-center w-full" onchange="togglePricingModel()">
+                    <option value="breakdown">Detailed Breakdown (Lists)</option>
+                    <option value="fixed">Fixed Price Job</option>
+                </select>
             </div>
 
-            <div class="bg-white p-5 rounded-3xl shadow-sm border border-stone-200 mb-6">
-                <div class="flex items-center text-emerald-700 font-black text-lg mb-4 bg-emerald-50 p-3 rounded-2xl">
-                    <div class="icon-box bg-white text-emerald-500 shadow-sm mr-3"><i class="fa-solid fa-stopwatch"></i></div>
-                    Labour & Costs
-                </div>
-                
-                <div class="mb-4 bg-stone-50 p-3 rounded-2xl border border-stone-100">
-                    <label class="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1 block">Labour Billing Type</label>
-                    <select id="labourType" class="ios-input font-bold text-stone-700 cursor-pointer bg-white" onchange="toggleLabourInputs()">
-                        <option value="hourly">Hourly Rate</option>
-                        <option value="fixed">Fixed Price</option>
-                    </select>
-                </div>
-
-                <div id="hourlyInputs" class="grid grid-cols-2 gap-4 mb-4 transition-all">
-                    <div>
-                        <label class="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1 block">Est. Hours</label>
-                        <input type="number" id="labourHours" class="ios-input calc-trigger font-black text-emerald-800" placeholder="0">
+            <div id="breakdownSection">
+                <div class="bg-themeCard p-5 rounded-3xl shadow-sm border border-themeBorder mb-6 transition-colors">
+                    <div class="flex justify-between items-center mb-4 bg-amber-500/10 p-3 rounded-2xl">
+                        <div class="flex items-center text-amber-600 font-black text-lg">
+                            <div class="icon-box bg-white text-amber-500 shadow-sm mr-3"><i class="fa-solid fa-toolbox"></i></div>
+                            Materials Breakdown
+                        </div>
+                        <button onclick="openCatalog()" class="bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-black shadow-sm active:scale-95"><i class="fa-solid fa-book-open mr-1"></i> Catalog</button>
                     </div>
-                    <div>
-                        <label class="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1 block">Rate (£/hr)</label>
-                        <input type="number" id="labourRate" class="ios-input calc-trigger font-black text-emerald-800" placeholder="0.00">
+                    
+                    <div class="flex justify-end mb-4 px-2">
+                        <div class="flex items-center bg-themeBg rounded-xl p-1 border border-themeBorder">
+                            <label class="text-[10px] font-black text-gray-500 mx-2 uppercase tracking-widest">Markup %</label>
+                            <input type="number" id="materialMarkup" class="ios-input w-20 py-1.5 px-2 text-center text-sm font-black text-amber-600 calc-trigger" placeholder="0">
+                        </div>
+                    </div>
+                    
+                    <div id="materialsContainer" class="space-y-3 mb-4"></div>
+                    <button onclick="addMaterialRow()" class="w-full text-sm font-black text-amber-600 bg-amber-500/10 py-3 rounded-xl transition active:scale-95 border border-amber-500/30 flex items-center justify-center">
+                        <i class="fa-solid fa-plus mr-2"></i> Add Custom Row
+                    </button>
+                </div>
+
+                <div class="bg-themeCard p-5 rounded-3xl shadow-sm border border-themeBorder mb-6 transition-colors">
+                    <div class="flex items-center text-emerald-600 font-black text-lg mb-4 bg-emerald-500/10 p-3 rounded-2xl">
+                        <div class="icon-box bg-white text-emerald-500 shadow-sm mr-3"><i class="fa-solid fa-stopwatch"></i></div>
+                        Labour Breakdown
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Est. Hours</label>
+                            <input type="number" id="labourHours" class="ios-input calc-trigger font-black text-emerald-600" placeholder="0">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Rate (£/hr)</label>
+                            <input type="number" id="labourRate" class="ios-input calc-trigger font-black text-emerald-600" placeholder="0.00">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="fixedSection" class="hidden space-y-6 mb-6">
+                <div class="bg-themeCard p-5 rounded-3xl shadow-sm border border-themeBorder transition-colors">
+                    <div class="flex items-center text-amber-600 font-black text-lg mb-4 bg-amber-500/10 p-3 rounded-2xl">
+                        <div class="icon-box bg-white text-amber-500 shadow-sm mr-3"><i class="fa-solid fa-box"></i></div>
+                        Fixed Materials
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Description</label>
+                            <input type="text" id="fixedMatDesc" class="ios-input font-bold" placeholder="e.g. All timber, hardware and finishes">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Total Cost (£)</label>
+                            <input type="number" id="fixedMatCost" class="ios-input calc-trigger font-black text-amber-600" placeholder="0.00">
+                        </div>
                     </div>
                 </div>
 
-                <div id="fixedInputs" class="hidden mb-4 transition-all">
-                    <label class="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1 block">Fixed Labour Cost (£)</label>
-                    <input type="number" id="labourFixed" class="ios-input calc-trigger font-black text-emerald-800" placeholder="0.00">
+                <div class="bg-themeCard p-5 rounded-3xl shadow-sm border border-themeBorder transition-colors">
+                    <div class="flex items-center text-emerald-600 font-black text-lg mb-4 bg-emerald-500/10 p-3 rounded-2xl">
+                        <div class="icon-box bg-white text-emerald-500 shadow-sm mr-3"><i class="fa-solid fa-hammer"></i></div>
+                        Fixed Labour
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Description</label>
+                            <input type="text" id="fixedLabDesc" class="ios-input font-bold" placeholder="e.g. Installation and finishing">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Total Cost (£)</label>
+                            <input type="number" id="fixedLabCost" class="ios-input calc-trigger font-black text-emerald-600" placeholder="0.00">
+                        </div>
+                    </div>
                 </div>
+            </div>
 
-                <div class="grid grid-cols-2 gap-4 pt-4 border-t border-stone-100">
+            <div class="bg-themeCard p-5 rounded-3xl shadow-sm border border-themeBorder mb-6 transition-colors">
+                <div class="grid grid-cols-2 gap-4">
                     <div class="flex items-center space-x-3">
                         <div class="icon-box bg-orange-100 text-orange-500 w-10 h-10"><i class="fa-solid fa-gas-pump"></i></div>
                         <div class="flex-1">
-                            <label class="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1 block">Fuel (£)</label>
+                            <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Fuel (£)</label>
                             <input type="number" id="costFuel" class="ios-input py-2 px-3 text-sm calc-trigger" placeholder="0.00">
                         </div>
                     </div>
                     <div class="flex items-center space-x-3">
                         <div class="icon-box bg-indigo-100 text-indigo-500 w-10 h-10"><i class="fa-solid fa-receipt"></i></div>
                         <div class="flex-1">
-                            <label class="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1 block">Misc (£)</label>
+                            <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Misc (£)</label>
                             <input type="number" id="costMisc" class="ios-input py-2 px-3 text-sm calc-trigger" placeholder="0.00">
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white p-5 rounded-3xl shadow-sm border border-stone-200 mb-6">
+            <div class="bg-themeCard p-5 rounded-3xl shadow-sm border border-themeBorder mb-6 transition-colors">
                 <div class="flex space-x-4 mb-5">
                     <div class="flex-1">
-                        <label class="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1 block">Deposit Reqd.</label>
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Deposit Reqd.</label>
                         <div class="relative">
-                            <i class="fa-solid fa-sterling-sign absolute left-4 top-1/2 transform -translate-y-1/2 text-stone-400"></i>
-                            <input type="number" id="quoteDeposit" class="ios-input pl-8 font-black text-stone-700" placeholder="0.00">
+                            <i class="fa-solid fa-sterling-sign absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            <input type="number" id="quoteDeposit" class="ios-input pl-8 font-black" placeholder="0.00">
                         </div>
                     </div>
                     <div class="flex-1">
-                        <label class="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1 block">Method</label>
-                        <select id="quotePaymentMethod" class="ios-input font-bold text-stone-700 cursor-pointer">
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Method</label>
+                        <select id="quotePaymentMethod" class="ios-input font-bold cursor-pointer">
                             <option value="Bank Transfer">Bank Tx</option>
                             <option value="Cash">Cash</option>
                         </select>
                     </div>
                 </div>
                 
-                <button onclick="openSignature()" class="w-full bg-stone-100 text-stone-600 font-black py-4 rounded-2xl border border-stone-200 active:scale-95 transition flex items-center justify-center">
+                <button onclick="openSignature()" class="w-full bg-themeBorder text-themeText font-black py-4 rounded-2xl active:scale-95 transition flex items-center justify-center">
                     <i class="fa-solid fa-signature mr-2 text-xl"></i> Capture Client Signature
                 </button>
-                <img id="signaturePreview" class="mt-4 bg-white rounded-2xl mx-auto hidden shadow-sm border border-stone-200 w-full max-h-24 object-contain p-2">
+                <img id="signaturePreview" class="mt-4 bg-white rounded-2xl mx-auto hidden shadow-sm border border-themeBorder w-full max-h-24 object-contain p-2">
             </div>
 
             <div class="bg-[#4a3728] p-6 rounded-3xl shadow-xl text-white mb-6 border-b-4 border-[#33251a]">
@@ -218,35 +332,45 @@
         </section>
 
         <section id="view-admin" class="view-section">
-            <h2 class="text-2xl font-black text-stone-800 mb-4 flex items-center"><i class="fa-solid fa-gear text-stone-400 mr-3"></i>Settings</h2>
+            <h2 class="text-2xl font-black text-themeText mb-4 flex items-center"><i class="fa-solid fa-gear text-gray-400 mr-3"></i>Settings</h2>
             
-            <div class="bg-white p-5 rounded-3xl shadow-sm border border-stone-200 space-y-4 mb-6">
-                <h3 class="font-black text-stone-700 text-lg border-b border-stone-100 pb-2">Defaults</h3>
+            <div class="bg-themeCard p-5 rounded-3xl shadow-sm border border-themeBorder space-y-4 mb-6 transition-colors">
+                <div style="border-bottom: 2px solid var(--ios-grey); padding-bottom: 20px;">
+                    <span style="font-size: 16px; font-weight: 800; color: var(--text); display: block; text-align: center;">Theme Selection</span>
+                    <div class="theme-segmented-control">
+                        <button id="btnLight" class="segment active" onclick="window.setThemeMode(false)">☀️ Light</button>
+                        <button id="btnDark" class="segment" onclick="window.setThemeMode(true)">🌙 Dark</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-themeCard p-5 rounded-3xl shadow-sm border border-themeBorder space-y-4 mb-6 transition-colors">
+                <h3 class="font-black text-themeText text-lg border-b border-themeBorder pb-2">Defaults</h3>
                 <div class="flex space-x-4">
                     <div class="flex-1">
-                        <label class="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1 block">Rate (£/hr)</label>
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Rate (£/hr)</label>
                         <input type="number" id="defaultRate" class="ios-input font-bold" placeholder="25.00">
                     </div>
                     <div class="flex-1">
-                        <label class="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1 block">Markup (%)</label>
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Markup (%)</label>
                         <input type="number" id="defaultMarkup" class="ios-input font-bold" placeholder="20">
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white p-5 rounded-3xl shadow-sm border border-stone-200 space-y-4 mb-6">
-                <h3 class="font-black text-stone-700 text-lg border-b border-stone-100 pb-2">Bank Details</h3>
+            <div class="bg-themeCard p-5 rounded-3xl shadow-sm border border-themeBorder space-y-4 mb-6 transition-colors">
+                <h3 class="font-black text-themeText text-lg border-b border-themeBorder pb-2">Bank Details</h3>
                 <div>
-                    <label class="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1 block">Account Name</label>
+                    <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Account Name</label>
                     <input type="text" id="bankName" class="ios-input font-bold" placeholder="e.g. David Joinery">
                 </div>
                 <div class="flex space-x-4">
                     <div class="flex-1">
-                        <label class="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1 block">Sort Code</label>
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Sort Code</label>
                         <input type="text" id="bankSort" class="ios-input font-bold tracking-widest" placeholder="00-00-00">
                     </div>
                     <div class="flex-1">
-                        <label class="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-1 block">Account No.</label>
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Account No.</label>
                         <input type="text" id="bankAcc" class="ios-input font-bold tracking-widest" placeholder="12345678">
                     </div>
                 </div>
@@ -255,69 +379,67 @@
                 </button>
             </div>
 
-            <div class="bg-white p-5 rounded-3xl shadow-sm border border-stone-200 space-y-4 mb-6">
-                <div class="flex justify-between items-center border-b border-stone-100 pb-2 mb-2">
-                    <h3 class="font-black text-stone-700 text-lg">Catalog Prices</h3>
-                    <i class="fa-solid fa-boxes-stacked text-stone-300 text-xl"></i>
+            <div class="bg-themeCard p-5 rounded-3xl shadow-sm border border-themeBorder space-y-4 mb-6 transition-colors">
+                <div class="flex justify-between items-center border-b border-themeBorder pb-2 mb-2">
+                    <h3 class="font-black text-themeText text-lg">Catalog Prices</h3>
+                    <i class="fa-solid fa-boxes-stacked text-gray-300 text-xl"></i>
                 </div>
-                <p class="text-xs font-bold text-stone-400 mb-2">Set your standard material costs (£) to speed up quoting.</p>
                 <div id="adminCatalogContainer" class="space-y-3"></div>
                 <button onclick="saveAdminCatalog()" class="w-full bg-[#f59e0b] text-white font-black py-4 rounded-xl transform active:scale-95 transition mt-2">
                     Update Catalog
                 </button>
             </div>
 
-            <div class="bg-red-50 p-5 rounded-3xl shadow-sm border border-red-200 space-y-4">
-                <h3 class="font-black text-red-600 text-lg flex items-center"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Danger Zone</h3>
-                <button onclick="clearDatabase()" class="w-full bg-white text-red-600 border border-red-200 font-black py-4 rounded-xl transform active:scale-95 transition active:bg-red-100">
+            <div class="bg-red-900/10 p-5 rounded-3xl shadow-sm border border-red-500/20 space-y-4">
+                <h3 class="font-black text-red-500 text-lg flex items-center"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Danger Zone</h3>
+                <button onclick="clearDatabase()" class="w-full bg-red-500 text-white font-black py-4 rounded-xl transform active:scale-95 transition">
                     Wipe All Data
                 </button>
-                <p class="text-center text-xs font-black text-red-300 mt-2 tracking-widest uppercase">Version 1.13</p>
+                <p class="text-center text-xs font-black text-red-400 mt-2 tracking-widest uppercase">Version 1.14</p>
             </div>
         </section>
     </main>
 
     <div id="catalogModal" class="modal-bg fixed inset-0 z-50 items-center justify-center p-4">
-        <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 relative flex flex-col max-h-[85vh]">
+        <div class="bg-themeCard w-full max-w-md rounded-3xl shadow-2xl p-6 relative flex flex-col max-h-[85vh]">
             <button onclick="closeCatalog()" class="absolute -top-4 -right-4 w-10 h-10 bg-[#4a3728] text-white rounded-full font-bold shadow-lg border-2 border-white"><i class="fa-solid fa-times"></i></button>
-            <h3 class="text-2xl font-black text-stone-800 mb-6 flex items-center"><div class="icon-box bg-amber-100 text-amber-500 mr-3"><i class="fa-solid fa-tree"></i></div> Timber Yard</h3>
+            <h3 class="text-2xl font-black text-themeText mb-6 flex items-center"><div class="icon-box bg-amber-500/20 text-amber-500 mr-3"><i class="fa-solid fa-tree"></i></div> Timber Yard</h3>
             <div id="catalogList" class="overflow-y-auto space-y-3 flex-1 pr-2"></div>
         </div>
     </div>
 
     <div id="sigModal" class="modal-bg fixed inset-0 z-50 items-center justify-center p-4">
-        <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 relative border-t-8 border-stone-800">
-            <h3 class="text-2xl font-black text-stone-800 mb-2 flex items-center"><div class="icon-box bg-stone-100 text-stone-600 mr-3"><i class="fa-solid fa-pen-nib"></i></div> Sign Here</h3>
-            <p class="text-xs font-bold text-stone-400 mb-5 tracking-wide">Please sign to approve the quote and terms.</p>
-            <div class="border-2 border-stone-200 rounded-2xl bg-stone-50 overflow-hidden mb-5">
+        <div class="bg-themeCard w-full max-w-md rounded-3xl shadow-2xl p-6 relative border-t-8 border-themeText">
+            <h3 class="text-2xl font-black text-themeText mb-2 flex items-center"><div class="icon-box bg-themeBorder text-themeText mr-3"><i class="fa-solid fa-pen-nib"></i></div> Sign Here</h3>
+            <p class="text-xs font-bold text-gray-400 mb-5 tracking-wide">Please sign to approve the quote and terms.</p>
+            <div class="border-2 border-themeBorder rounded-2xl bg-white overflow-hidden mb-5">
                 <canvas id="sigCanvas" class="w-full h-48 touch-none"></canvas>
             </div>
             <div class="flex space-x-3">
-                <button onclick="clearSignature()" class="w-16 bg-stone-200 text-stone-600 font-black rounded-xl active:bg-stone-300"><i class="fa-solid fa-eraser"></i></button>
+                <button onclick="clearSignature()" class="w-16 bg-themeBorder text-themeText font-black rounded-xl active:bg-gray-300"><i class="fa-solid fa-eraser"></i></button>
                 <button onclick="saveSignature()" class="flex-1 bg-[#4a3728] text-white font-black py-4 rounded-xl active:scale-95 shadow-sm text-lg">Approve</button>
             </div>
-            <button onclick="closeSignature()" class="w-full mt-4 text-sm font-black text-stone-400 py-2">Cancel</button>
+            <button onclick="closeSignature()" class="w-full mt-4 text-sm font-black text-gray-400 py-2">Cancel</button>
         </div>
     </div>
 
-    <nav class="bg-white border-t border-stone-200 flex justify-around items-center pb-safe pt-2 fixed bottom-0 w-full z-40">
-        <button onclick="switchTab('dashboard')" class="flex flex-col items-center p-2 w-full text-stone-400 hover:text-[#4a3728] tab-btn active-tab transition-colors">
+    <nav class="bg-themeCard border-t border-themeBorder flex justify-around items-center pb-safe pt-2 fixed bottom-0 w-full z-40 transition-colors">
+        <button onclick="switchTab('dashboard')" class="flex flex-col items-center p-2 w-full text-gray-400 tab-btn active-tab transition-colors">
             <i class="fa-solid fa-folder-open text-xl mb-1"></i>
             <span class="text-[10px] font-black uppercase tracking-widest">Jobs</span>
         </button>
-        <button onclick="switchTab('new-quote')" class="flex flex-col items-center p-2 w-full text-stone-400 hover:text-[#f59e0b] tab-btn transition-colors">
+        <button onclick="switchTab('new-quote')" class="flex flex-col items-center p-2 w-full text-gray-400 tab-btn transition-colors">
             <i class="fa-solid fa-square-plus text-xl mb-1"></i>
             <span class="text-[10px] font-black uppercase tracking-widest">New</span>
         </button>
-        <button onclick="switchTab('admin')" class="flex flex-col items-center p-2 w-full text-stone-400 hover:text-[#4a3728] tab-btn transition-colors">
+        <button onclick="switchTab('admin')" class="flex flex-col items-center p-2 w-full text-gray-400 tab-btn transition-colors">
             <i class="fa-solid fa-gear text-xl mb-1"></i>
             <span class="text-[10px] font-black uppercase tracking-widest">Settings</span>
         </button>
     </nav>
 
     <style>
-        .active-tab { color: #4a3728 !important; }
-        .active-tab:nth-child(2) { color: #f59e0b !important; }
+        .active-tab { color: #f59e0b !important; }
     </style>
 
     <script src="app.js"></script>
