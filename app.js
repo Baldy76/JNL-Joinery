@@ -1,9 +1,10 @@
-// Version: 1.12 | Date: April 2026
+// Version: 1.13 | Date: April 2026
 const db = localforage.createInstance({ name: "DNL_DB" });
 
 let currentPhotoData = null;
 let currentSignatureData = null;
 let signaturePad = null;
+let appLogoBase64 = null; // New variable to hold the logo for the PDF
 
 // --- VIEW NAVIGATION ---
 function switchTab(tabId) {
@@ -31,15 +32,28 @@ function switchTab(tabId) {
     }
 }
 
+// Convert the local logo.png into data so jsPDF can print it
+async function preloadLogo() {
+    try {
+        const response = await fetch('logo.png');
+        const blob = await response.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => { appLogoBase64 = reader.result; };
+        reader.readAsDataURL(blob);
+    } catch (e) {
+        console.log("Could not preload logo for PDF", e);
+    }
+}
+
 window.addEventListener('DOMContentLoaded', () => {
     for(let i=0; i<3; i++) { addMaterialRow(); } 
     loadSettings();
-    initCatalogUI(); // Now loads from DB
+    initCatalogUI();
+    preloadLogo(); // Fetch logo for PDF
     const canvas = document.getElementById('sigCanvas');
     signaturePad = new SignaturePad(canvas, { backgroundColor: 'rgb(249, 250, 251)', penColor: '#4f46e5' });
 });
 
-// --- LABOUR TOGGLE ---
 function toggleLabourInputs() {
     const type = document.getElementById('labourType').value;
     if(type === 'hourly') {
@@ -52,7 +66,6 @@ function toggleLabourInputs() {
     calculateTotal();
 }
 
-// --- VOICE & MEDIA ---
 function startDictation() {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -125,8 +138,6 @@ async function loadCatalogData() {
 
 async function initCatalogUI() {
     const cat = await loadCatalogData();
-    
-    // 1. Build Quote Modal Catalog
     const list = document.getElementById('catalogList');
     list.innerHTML = '';
     cat.forEach(item => {
@@ -140,7 +151,6 @@ async function initCatalogUI() {
         list.appendChild(div);
     });
 
-    // 2. Build Admin Editor Catalog
     const adminList = document.getElementById('adminCatalogContainer');
     adminList.innerHTML = '';
     cat.forEach((item, index) => {
@@ -178,7 +188,7 @@ function selectCatalogItem(name, cost) {
     if (navigator.vibrate) navigator.vibrate([20]); 
 }
 
-// --- SETTINGS & ADDRESS BOOK ---
+// Settings & Address Book
 async function loadSettings() {
     const settings = await db.getItem('dnl_settings');
     if(settings) {
@@ -225,7 +235,6 @@ async function saveToAddressBook(name, phone, email) {
     await db.setItem('dnl_clients', clients);
 }
 
-// --- MATERIALS & MATH ---
 function addMaterialRow(qty = '', desc = '', cost = '') {
     const container = document.getElementById('materialsContainer');
     const row = document.createElement('div');
@@ -260,13 +269,10 @@ function calculateTotal() {
     const fuel = parseFloat(document.getElementById('costFuel').value) || 0;
     const misc = parseFloat(document.getElementById('costMisc').value) || 0;
     
-    // Check Labour Type
     let labTotal = 0;
     const lType = document.getElementById('labourType').value;
     if(lType === 'hourly') {
-        const hours = parseFloat(document.getElementById('labourHours').value) || 0;
-        const rate = parseFloat(document.getElementById('labourRate').value) || 0;
-        labTotal = hours * rate;
+        labTotal = (parseFloat(document.getElementById('labourHours').value) || 0) * (parseFloat(document.getElementById('labourRate').value) || 0);
     } else {
         labTotal = parseFloat(document.getElementById('labourFixed').value) || 0;
     }
@@ -276,7 +282,6 @@ function calculateTotal() {
     return total;
 }
 
-// Clear Form Logic
 function clearQuoteForm() {
     if(!confirm("Are you sure you want to clear this quote? All unsaved details will be lost.")) return;
     
@@ -301,7 +306,7 @@ function clearQuoteForm() {
     if (navigator.vibrate) navigator.vibrate([20, 20]);
 }
 
-// --- SAVE & PDF ---
+// --- SAVE & GENERATE ---
 async function saveAndGenerate() {
     const name = document.getElementById('custName').value;
     if (!name) {
@@ -364,8 +369,12 @@ async function saveAndGenerate() {
     for(let i=0; i<3; i++) { addMaterialRow(); } 
     loadSettings(); 
     
-    generatePDF(quoteData, 'QUOTE', false);
+    // UX FIX: Switch to Dashboard first, then launch PDF after a tiny delay
+    // This ensures when the user taps "Done" on the PDF preview, they are back at the app.
     switchTab('dashboard');
+    setTimeout(() => {
+        generatePDF(quoteData, 'QUOTE', false);
+    }, 150);
 }
 
 // --- DASHBOARD ---
@@ -457,59 +466,77 @@ async function clearDatabase() {
     }
 }
 
-// --- PDF GENERATOR ---
+// --- PDF GENERATOR (With New Logo Header) ---
 async function generatePDF(data, type = 'QUOTE', triggerNativeShare = false) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     const brandDark = [74, 55, 40]; 
     
-    doc.setFillColor(...brandDark);
-    doc.rect(0, 0, 210, 35, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(24);
+    // --- REDESIGNED HEADER FOR LOGO ---
+    // If the logo was preloaded successfully, add it to the top left
+    if (appLogoBase64) {
+        doc.addImage(appLogoBase64, 'PNG', 20, 10, 32, 32); 
+    }
+    
+    // Company Name & Tagline next to Logo
+    doc.setTextColor(...brandDark);
+    doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
-    doc.text("D.N.L JOINERY & FENCING", 20, 23);
+    doc.text("D.N.L JOINERY & FENCING", 58, 24);
 
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "italic");
+    doc.text("Professional Carpentry & Fencing Services", 58, 30);
+
+    // Document Type & Meta (Top Right)
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
     
     if(type === 'INVOICE') {
-        doc.text("INVOICE", 140, 50);
+        doc.text("INVOICE", 140, 24);
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
         const dueDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString();
-        doc.text(`REF NO: ${data.id}`, 140, 58);
-        doc.text(`DATE: ${data.date}`, 140, 63);
-        doc.text(`DUE BY: ${dueDate}`, 140, 68);
+        doc.text(`REF NO: ${data.id}`, 140, 30);
+        doc.text(`DATE: ${data.date}`, 140, 35);
+        doc.text(`DUE BY: ${dueDate}`, 140, 40);
     } else {
-        doc.text("QUOTATION", 140, 50);
+        doc.text("QUOTATION", 140, 24);
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
-        doc.text(`REF NO: ${data.id}`, 140, 58);
-        doc.text(`DATE: ${data.date}`, 140, 63);
-        doc.text(`VALID FOR: 30 Days`, 140, 68); 
+        doc.text(`REF NO: ${data.id}`, 140, 30);
+        doc.text(`DATE: ${data.date}`, 140, 35);
+        doc.text(`VALID FOR: 30 Days`, 140, 40); 
     }
 
+    // Separator Line
+    doc.setDrawColor(...brandDark);
+    doc.setLineWidth(0.5);
+    doc.line(20, 48, 190, 48);
+
+    // --- CLIENT DETAILS ---
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(100, 100, 100);
-    doc.text("BILLED TO:", 20, 50);
+    doc.text("BILLED TO:", 20, 58);
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(12);
-    doc.text(data.customer, 20, 57);
+    doc.text(data.customer, 20, 65);
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(data.description, 20, 63, { maxWidth: 90 });
+    doc.text(data.description, 20, 71, { maxWidth: 90 });
 
+    // --- TABLE ---
     doc.setDrawColor(200, 200, 200);
     doc.setFillColor(245, 245, 245);
-    doc.rect(20, 80, 170, 10, 'F');
+    doc.rect(20, 88, 170, 10, 'F');
     doc.setFont("helvetica", "bold");
-    doc.text("DESCRIPTION", 23, 87);
-    doc.text("AMOUNT", 170, 87);
+    doc.text("DESCRIPTION", 23, 95);
+    doc.text("AMOUNT", 170, 95);
 
-    let y = 98;
+    let y = 106;
     doc.setFont("helvetica", "normal");
     
     if (data.breakdown.materialsList && data.breakdown.materialsList.length > 0) {
@@ -533,6 +560,7 @@ async function generatePDF(data, type = 'QUOTE', triggerNativeShare = false) {
         }
     });
 
+    // --- TOTALS ---
     doc.line(120, y + 5, 190, y + 5);
     y += 15;
     doc.setFontSize(12);
@@ -552,6 +580,7 @@ async function generatePDF(data, type = 'QUOTE', triggerNativeShare = false) {
         doc.text(`£${(data.total - parseFloat(data.deposit)).toFixed(2)}`, 170, y);
     }
     
+    // --- PAYMENT BOX ---
     y += 20;
     doc.setFillColor(250, 250, 250);
     doc.setDrawColor(220, 220, 220);
@@ -584,6 +613,7 @@ async function generatePDF(data, type = 'QUOTE', triggerNativeShare = false) {
     doc.setTextColor(150, 150, 150);
     doc.text("Thank you for choosing D.N.L Joinery.", 105, 285, null, null, "center");
 
+    // Page 2: Terms
     doc.addPage();
     doc.setFillColor(...brandDark);
     doc.rect(0, 0, 210, 20, 'F');
