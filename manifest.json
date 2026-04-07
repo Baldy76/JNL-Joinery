@@ -3,8 +3,8 @@
   "short_name": "DNL App",
   "start_url": "index.html",
   "display": "standalone",
-  "background_color": "#f5f5f4",
-  "theme_color": "#4a3728",
+  "background_color": "#fefce8",
+  "theme_color": "#fefce8",
   "icons": [
     {
       "src": "logo.png",
