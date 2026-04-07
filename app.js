@@ -1,10 +1,50 @@
-// Version: 1.13 | Date: April 2026
+// Version: 1.14 | Date: April 2026
 const db = localforage.createInstance({ name: "DNL_DB" });
 
 let currentPhotoData = null;
 let currentSignatureData = null;
 let signaturePad = null;
-let appLogoBase64 = null; // New variable to hold the logo for the PDF
+let appLogoBase64 = null; 
+
+// --- YOUR PROVIDED THEME ENGINE ---
+function applyTheme(isDark) {
+    document.body.classList.toggle('dark-mode', isDark);
+    
+    const meta = document.getElementById('theme-meta'); 
+    if(meta) meta.content = isDark ? "#000000" : "#f2f2f7";
+    
+    const btnLight = document.getElementById('btnLight'); 
+    const btnDark = document.getElementById('btnDark');
+    
+    if (btnLight && btnDark) {
+        if (isDark) { 
+            btnLight.classList.remove('active'); 
+            btnDark.classList.add('active'); 
+        } else { 
+            btnLight.classList.add('active'); 
+            btnDark.classList.remove('active'); 
+        }
+    }
+}
+
+window.setThemeMode = (isDark) => { 
+    if (navigator.vibrate) navigator.vibrate([15]); 
+    applyTheme(isDark); 
+    localStorage.setItem('DNL_Theme', isDark); 
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    const savedTheme = localStorage.getItem('DNL_Theme') === 'true';
+    applyTheme(savedTheme);
+    
+    for(let i=0; i<3; i++) { addMaterialRow(); } 
+    loadSettings();
+    initCatalogUI();
+    preloadLogo(); 
+    const canvas = document.getElementById('sigCanvas');
+    signaturePad = new SignaturePad(canvas, { backgroundColor: 'rgb(255, 255, 255)', penColor: '#000000' });
+});
+
 
 // --- VIEW NAVIGATION ---
 function switchTab(tabId) {
@@ -32,7 +72,6 @@ function switchTab(tabId) {
     }
 }
 
-// Convert the local logo.png into data so jsPDF can print it
 async function preloadLogo() {
     try {
         const response = await fetch('logo.png');
@@ -45,23 +84,15 @@ async function preloadLogo() {
     }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-    for(let i=0; i<3; i++) { addMaterialRow(); } 
-    loadSettings();
-    initCatalogUI();
-    preloadLogo(); // Fetch logo for PDF
-    const canvas = document.getElementById('sigCanvas');
-    signaturePad = new SignaturePad(canvas, { backgroundColor: 'rgb(249, 250, 251)', penColor: '#4f46e5' });
-});
-
-function toggleLabourInputs() {
-    const type = document.getElementById('labourType').value;
-    if(type === 'hourly') {
-        document.getElementById('hourlyInputs').classList.remove('hidden');
-        document.getElementById('fixedInputs').classList.add('hidden');
+// --- PRICING MODEL TOGGLE ---
+function togglePricingModel() {
+    const model = document.getElementById('pricingModel').value;
+    if(model === 'fixed') {
+        document.getElementById('breakdownSection').classList.add('hidden');
+        document.getElementById('fixedSection').classList.remove('hidden');
     } else {
-        document.getElementById('hourlyInputs').classList.add('hidden');
-        document.getElementById('fixedInputs').classList.remove('hidden');
+        document.getElementById('breakdownSection').classList.remove('hidden');
+        document.getElementById('fixedSection').classList.add('hidden');
     }
     calculateTotal();
 }
@@ -142,11 +173,11 @@ async function initCatalogUI() {
     list.innerHTML = '';
     cat.forEach(item => {
         const div = document.createElement('div');
-        div.className = "flex justify-between items-center bg-stone-50 p-4 rounded-2xl border border-stone-200 cursor-pointer active:bg-amber-50 active:scale-95 transition-all shadow-sm";
+        div.className = "flex justify-between items-center bg-themeBg p-4 rounded-2xl border border-themeBorder cursor-pointer active:scale-95 transition-all";
         div.onclick = () => { selectCatalogItem(item.name, item.cost); };
         div.innerHTML = `
-            <div class="flex items-center"><div class="text-2xl mr-3">${item.icon}</div><span class="font-black text-stone-700">${item.name}</span></div>
-            <span class="text-stone-600 font-black px-2 py-1 rounded-lg bg-white border border-stone-200">£${item.cost.toFixed(2)}</span>
+            <div class="flex items-center"><div class="text-2xl mr-3">${item.icon}</div><span class="font-black text-themeText">${item.name}</span></div>
+            <span class="text-themeText font-black px-2 py-1 rounded-lg bg-themeCard border border-themeBorder">£${item.cost.toFixed(2)}</span>
         `;
         list.appendChild(div);
     });
@@ -155,12 +186,12 @@ async function initCatalogUI() {
     adminList.innerHTML = '';
     cat.forEach((item, index) => {
         const div = document.createElement('div');
-        div.className = "flex justify-between items-center bg-stone-50 p-2 rounded-xl border border-stone-100";
+        div.className = "flex justify-between items-center bg-themeBg p-2 rounded-xl border border-themeBorder";
         div.innerHTML = `
-            <div class="flex items-center flex-1"><span class="text-lg mr-2">${item.icon}</span><span class="font-bold text-sm text-stone-600">${item.name}</span></div>
+            <div class="flex items-center flex-1"><span class="text-lg mr-2">${item.icon}</span><span class="font-bold text-sm text-themeText">${item.name}</span></div>
             <div class="relative w-24">
-                <i class="fa-solid fa-sterling-sign absolute left-3 top-1/2 transform -translate-y-1/2 text-stone-400 text-xs"></i>
-                <input type="number" id="admin_cat_${index}" class="ios-input w-full pl-7 py-2 text-sm font-black text-stone-700" value="${item.cost}">
+                <i class="fa-solid fa-sterling-sign absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-xs"></i>
+                <input type="number" id="admin_cat_${index}" class="ios-input w-full pl-7 py-2 text-sm font-black" value="${item.cost}">
             </div>
         `;
         adminList.appendChild(div);
@@ -225,27 +256,27 @@ async function fillClientDetails() {
     const name = document.getElementById('custName').value;
     const clients = await db.getItem('dnl_clients') || {};
     if(clients[name]) {
+        document.getElementById('custAddress').value = clients[name].address || '';
         document.getElementById('custPhone').value = clients[name].phone || '';
         document.getElementById('custEmail').value = clients[name].email || '';
     }
 }
-async function saveToAddressBook(name, phone, email) {
+async function saveToAddressBook(name, address, phone, email) {
     const clients = await db.getItem('dnl_clients') || {};
-    clients[name] = { phone: phone, email: email };
+    clients[name] = { address: address, phone: phone, email: email };
     await db.setItem('dnl_clients', clients);
 }
 
 function addMaterialRow(qty = '', desc = '', cost = '') {
     const container = document.getElementById('materialsContainer');
     const row = document.createElement('div');
-    row.className = 'flex space-x-2 material-row items-center bg-stone-50 p-2 rounded-2xl border border-stone-100 shadow-sm';
+    row.className = 'flex space-x-2 material-row items-center bg-themeBg p-2 rounded-2xl border border-themeBorder shadow-sm';
     row.innerHTML = `
-        <div class="icon-box bg-white text-stone-400 shadow-sm w-10 h-10 rounded-xl"><i class="fa-solid fa-cube"></i></div>
-        <input type="text" class="ios-input w-16 text-center py-2 px-1 text-sm bg-white border-none shadow-sm mat-qty font-bold" placeholder="Qty" value="${qty}">
-        <input type="text" class="ios-input flex-1 py-2 px-3 text-sm bg-white border-none shadow-sm mat-desc font-bold" placeholder="Item name" value="${desc}">
+        <input type="text" class="ios-input w-16 text-center py-2 px-1 text-sm bg-themeCard border-none shadow-sm mat-qty font-bold" placeholder="Qty" value="${qty}">
+        <input type="text" class="ios-input flex-1 py-2 px-3 text-sm bg-themeCard border-none shadow-sm mat-desc font-bold" placeholder="Item name" value="${desc}">
         <div class="relative w-24">
             <i class="fa-solid fa-sterling-sign absolute left-3 top-1/2 transform -translate-y-1/2 text-amber-500 text-xs"></i>
-            <input type="number" class="ios-input w-full mat-cost calc-trigger pl-7 py-2 text-sm font-black text-amber-700 bg-amber-50 border-none shadow-sm" placeholder="0.00" value="${cost}">
+            <input type="number" class="ios-input w-full mat-cost calc-trigger pl-7 py-2 text-sm font-black text-amber-600 bg-amber-500/10 border-none shadow-sm" placeholder="0.00" value="${cost}">
         </div>
     `;
     if(desc) container.insertBefore(row, container.firstChild);
@@ -261,23 +292,28 @@ function bindCalcTriggers() {
 }
 
 function calculateTotal() {
-    let rawMatTotal = 0;
-    document.querySelectorAll('.mat-cost').forEach(input => { rawMatTotal += parseFloat(input.value) || 0; });
-    const markupPct = parseFloat(document.getElementById('materialMarkup').value) || 0;
-    const matTotal = rawMatTotal * (1 + (markupPct / 100)); 
-    
+    const model = document.getElementById('pricingModel').value;
+    let mainCosts = 0;
+
+    if(model === 'fixed') {
+        const fixedMat = parseFloat(document.getElementById('fixedMatCost').value) || 0;
+        const fixedLab = parseFloat(document.getElementById('fixedLabCost').value) || 0;
+        mainCosts = fixedMat + fixedLab;
+    } else {
+        let rawMatTotal = 0;
+        document.querySelectorAll('.mat-cost').forEach(input => { rawMatTotal += parseFloat(input.value) || 0; });
+        const markupPct = parseFloat(document.getElementById('materialMarkup').value) || 0;
+        const matTotal = rawMatTotal * (1 + (markupPct / 100)); 
+        
+        const hours = parseFloat(document.getElementById('labourHours').value) || 0;
+        const rate = parseFloat(document.getElementById('labourRate').value) || 0;
+        mainCosts = matTotal + (hours * rate);
+    }
+
     const fuel = parseFloat(document.getElementById('costFuel').value) || 0;
     const misc = parseFloat(document.getElementById('costMisc').value) || 0;
     
-    let labTotal = 0;
-    const lType = document.getElementById('labourType').value;
-    if(lType === 'hourly') {
-        labTotal = (parseFloat(document.getElementById('labourHours').value) || 0) * (parseFloat(document.getElementById('labourRate').value) || 0);
-    } else {
-        labTotal = parseFloat(document.getElementById('labourFixed').value) || 0;
-    }
-    
-    const total = matTotal + fuel + misc + labTotal;
+    const total = mainCosts + fuel + misc;
     document.getElementById('displayTotal').innerText = `£${total.toFixed(2)}`;
     return total;
 }
@@ -295,8 +331,8 @@ function clearQuoteForm() {
     currentSignatureData = null;
     if(signaturePad) signaturePad.clear();
 
-    document.getElementById('labourType').value = 'hourly';
-    toggleLabourInputs();
+    document.getElementById('pricingModel').value = 'breakdown';
+    togglePricingModel();
 
     document.getElementById('materialsContainer').innerHTML = '';
     for(let i=0; i<3; i++) { addMaterialRow(); } 
@@ -314,43 +350,47 @@ async function saveAndGenerate() {
         return alert("Customer Name is required.");
     }
 
+    const model = document.getElementById('pricingModel').value;
     const markupPct = parseFloat(document.getElementById('materialMarkup').value) || 0;
+    
     const materialsList = [];
     let matTotalCost = 0;
     
-    document.querySelectorAll('.material-row').forEach(row => {
-        const qty = row.querySelector('.mat-qty').value;
-        const mDesc = row.querySelector('.mat-desc').value;
-        const rawCost = parseFloat(row.querySelector('.mat-cost').value) || 0;
-        const markedUpCost = rawCost * (1 + (markupPct / 100));
-        if (qty || mDesc || rawCost) {
-            materialsList.push({ qty, desc: mDesc, cost: markedUpCost });
-            matTotalCost += markedUpCost;
-        }
-    });
-
-    let labTotal = 0;
-    const lType = document.getElementById('labourType').value;
-    if(lType === 'hourly') {
-        labTotal = (parseFloat(document.getElementById('labourHours').value) || 0) * (parseFloat(document.getElementById('labourRate').value) || 0);
-    } else {
-        labTotal = parseFloat(document.getElementById('labourFixed').value) || 0;
+    if(model === 'breakdown') {
+        document.querySelectorAll('.material-row').forEach(row => {
+            const qty = row.querySelector('.mat-qty').value;
+            const mDesc = row.querySelector('.mat-desc').value;
+            const rawCost = parseFloat(row.querySelector('.mat-cost').value) || 0;
+            const markedUpCost = rawCost * (1 + (markupPct / 100));
+            if (qty || mDesc || rawCost) {
+                materialsList.push({ qty, desc: mDesc, cost: markedUpCost });
+                matTotalCost += markedUpCost;
+            }
+        });
     }
 
     const quoteData = {
         id: `DNL-${Math.floor(Math.random() * 10000)}`,
         date: new Date().toLocaleDateString(),
         customer: name,
+        address: document.getElementById('custAddress').value,
         phone: document.getElementById('custPhone').value,
         email: document.getElementById('custEmail').value,
         description: document.getElementById('jobDesc').value,
         status: 'Sent', 
+        pricingModel: model,
         breakdown: {
             materialsList: materialsList,
             materials: matTotalCost,
             fuel: parseFloat(document.getElementById('costFuel').value) || 0,
             misc: parseFloat(document.getElementById('costMisc').value) || 0,
-            labour: labTotal,
+            labour: (parseFloat(document.getElementById('labourHours').value) || 0) * (parseFloat(document.getElementById('labourRate').value) || 0),
+        },
+        fixedData: {
+            matDesc: document.getElementById('fixedMatDesc').value,
+            matCost: parseFloat(document.getElementById('fixedMatCost').value) || 0,
+            labDesc: document.getElementById('fixedLabDesc').value,
+            labCost: parseFloat(document.getElementById('fixedLabCost').value) || 0,
         },
         total: calculateTotal(),
         deposit: parseFloat(document.getElementById('quoteDeposit').value) || 0,
@@ -359,18 +399,16 @@ async function saveAndGenerate() {
         signature: currentSignatureData
     };
 
-    await saveToAddressBook(name, quoteData.phone, quoteData.email);
+    await saveToAddressBook(name, quoteData.address, quoteData.phone, quoteData.email);
     await db.setItem(quoteData.id, quoteData);
     
     document.querySelectorAll('input:not(#bankName, #bankSort, #bankAcc, #defaultRate, #defaultMarkup), textarea').forEach(el => el.value = '');
-    document.getElementById('labourType').value = 'hourly';
-    toggleLabourInputs();
+    document.getElementById('pricingModel').value = 'breakdown';
+    togglePricingModel();
     document.getElementById('materialsContainer').innerHTML = '';
     for(let i=0; i<3; i++) { addMaterialRow(); } 
     loadSettings(); 
     
-    // UX FIX: Switch to Dashboard first, then launch PDF after a tiny delay
-    // This ensures when the user taps "Done" on the PDF preview, they are back at the app.
     switchTab('dashboard');
     setTimeout(() => {
         generatePDF(quoteData, 'QUOTE', false);
@@ -401,7 +439,7 @@ async function loadQuotes() {
     const currentMonth = new Date().getMonth();
 
     if (quoteKeys.length === 0) {
-        list.innerHTML = `<div class="text-center mt-10 p-6 bg-white rounded-3xl shadow-sm border border-stone-200"><p class="font-black text-stone-500">No jobs yet.</p></div>`;
+        list.innerHTML = `<div class="text-center mt-10 p-6 bg-themeCard rounded-3xl shadow-sm border border-themeBorder"><p class="font-black text-gray-500">No jobs yet.</p></div>`;
         document.getElementById('monthlyRevenue').innerText = "£0.00";
         return;
     }
@@ -413,17 +451,17 @@ async function loadQuotes() {
         
         const status = quote.status || 'Draft';
         const card = document.createElement('div');
-        card.className = `bg-white p-5 rounded-3xl shadow-sm border border-stone-200 flex flex-col relative mb-4`;
+        card.className = `bg-themeCard p-5 rounded-3xl shadow-sm border border-themeBorder flex flex-col relative mb-4 transition-colors`;
         
         card.innerHTML = `
             <div class="flex justify-between items-start mb-4">
                 <div>
-                    <h4 class="font-black text-lg text-stone-800 leading-tight">${quote.customer}</h4>
-                    <p class="text-[10px] font-black text-stone-400 mt-1 uppercase tracking-widest">${quote.date} &nbsp;•&nbsp; ${quote.id.replace('DNL-','')}</p>
+                    <h4 class="font-black text-lg text-themeText leading-tight">${quote.customer}</h4>
+                    <p class="text-[10px] font-black text-gray-400 mt-1 uppercase tracking-widest">${quote.date} &nbsp;•&nbsp; ${quote.id.replace('DNL-','')}</p>
                 </div>
                 <div class="text-right">
-                    <p class="font-black text-2xl text-[#4a3728] tracking-tighter">£${quote.total.toFixed(2)}</p>
-                    <select onchange="updateStatus('${quote.id}', this.value)" class="text-xs mt-1 py-1 px-3 rounded-full border outline-none font-black bg-stone-50 cursor-pointer text-stone-600 appearance-none text-center block w-full">
+                    <p class="font-black text-2xl text-[#f59e0b] tracking-tighter">£${quote.total.toFixed(2)}</p>
+                    <select onchange="updateStatus('${quote.id}', this.value)" class="text-xs mt-1 py-1 px-3 rounded-full border outline-none font-black bg-themeBg cursor-pointer text-themeText appearance-none text-center block w-full">
                         <option value="Draft" ${status==='Draft'?'selected':''}>🟡 Draft</option>
                         <option value="Sent" ${status==='Sent'?'selected':''}>🔵 Sent</option>
                         <option value="Accepted" ${status==='Accepted'?'selected':''}>🟣 Accepted</option>
@@ -432,13 +470,13 @@ async function loadQuotes() {
                 </div>
             </div>
             <div class="flex space-x-2 mt-2">
-                <button onclick="generatePDF(await db.getItem('${quote.id}'), 'QUOTE', false)" class="flex-1 text-xs text-stone-700 bg-stone-100 hover:bg-stone-200 py-3 rounded-2xl font-black transition"><i class="fa-solid fa-file-invoice mr-1 text-blue-500"></i> Quote</button>
-                <button onclick="generatePDF(await db.getItem('${quote.id}'), 'INVOICE', false)" class="flex-1 text-xs text-stone-700 bg-stone-100 hover:bg-stone-200 py-3 rounded-2xl font-black transition"><i class="fa-solid fa-receipt mr-1 text-emerald-500"></i> Invoice</button>
+                <button onclick="generatePDF(await db.getItem('${quote.id}'), 'QUOTE', false)" class="flex-1 text-xs text-themeText bg-themeBg hover:opacity-80 py-3 rounded-2xl font-black transition border border-themeBorder"><i class="fa-solid fa-file-invoice mr-1 text-blue-500"></i> Quote</button>
+                <button onclick="generatePDF(await db.getItem('${quote.id}'), 'INVOICE', false)" class="flex-1 text-xs text-themeText bg-themeBg hover:opacity-80 py-3 rounded-2xl font-black transition border border-themeBorder"><i class="fa-solid fa-receipt mr-1 text-emerald-500"></i> Invoice</button>
             </div>
-            <div class="flex justify-between items-center mt-3 pt-3 border-t border-stone-100">
+            <div class="flex justify-between items-center mt-3 pt-3 border-t border-themeBorder">
                 <div class="flex space-x-2">
-                    <button onclick="sendQuickMessage('${quote.id}', 'whatsapp')" class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center"><i class="fa-brands fa-whatsapp text-xl"></i></button>
-                    <button onclick="sendQuickMessage('${quote.id}', 'sms')" class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center"><i class="fa-solid fa-comment-sms text-lg"></i></button>
+                    <button onclick="sendQuickMessage('${quote.id}', 'whatsapp')" class="w-10 h-10 rounded-full bg-green-500/20 text-green-600 flex items-center justify-center hover:bg-green-500/30 transition"><i class="fa-brands fa-whatsapp text-xl"></i></button>
+                    <button onclick="sendQuickMessage('${quote.id}', 'sms')" class="w-10 h-10 rounded-full bg-blue-500/20 text-blue-600 flex items-center justify-center hover:bg-blue-500/30 transition"><i class="fa-solid fa-comment-sms text-lg"></i></button>
                 </div>
                 <button onclick="generatePDF(await db.getItem('${quote.id}'), 'QUOTE', true)" class="px-5 h-10 rounded-full bg-[#4a3728] text-white flex items-center justify-center text-xs font-black shadow-md"><i class="fa-solid fa-share-nodes mr-2"></i> Share PDF</button>
             </div>
@@ -466,19 +504,16 @@ async function clearDatabase() {
     }
 }
 
-// --- PDF GENERATOR (With New Logo Header) ---
+// --- PDF GENERATOR (UPDATED FOR FIXED PRICE & ADDRESS) ---
 async function generatePDF(data, type = 'QUOTE', triggerNativeShare = false) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     const brandDark = [74, 55, 40]; 
     
-    // --- REDESIGNED HEADER FOR LOGO ---
-    // If the logo was preloaded successfully, add it to the top left
     if (appLogoBase64) {
         doc.addImage(appLogoBase64, 'PNG', 20, 10, 32, 32); 
     }
     
-    // Company Name & Tagline next to Logo
     doc.setTextColor(...brandDark);
     doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
@@ -489,7 +524,6 @@ async function generatePDF(data, type = 'QUOTE', triggerNativeShare = false) {
     doc.setFont("helvetica", "italic");
     doc.text("Professional Carpentry & Fencing Services", 58, 30);
 
-    // Document Type & Meta (Top Right)
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
@@ -511,12 +545,10 @@ async function generatePDF(data, type = 'QUOTE', triggerNativeShare = false) {
         doc.text(`VALID FOR: 30 Days`, 140, 40); 
     }
 
-    // Separator Line
     doc.setDrawColor(...brandDark);
     doc.setLineWidth(0.5);
     doc.line(20, 48, 190, 48);
 
-    // --- CLIENT DETAILS ---
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(100, 100, 100);
@@ -524,11 +556,18 @@ async function generatePDF(data, type = 'QUOTE', triggerNativeShare = false) {
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(12);
     doc.text(data.customer, 20, 65);
+    
+    let infoY = 71;
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(data.description, 20, 71, { maxWidth: 90 });
+    
+    // Add Address to PDF if it exists
+    if(data.address) {
+        doc.text(data.address, 20, infoY, { maxWidth: 90 });
+        infoY += 6;
+    }
+    doc.text(data.description, 20, infoY, { maxWidth: 90 });
 
-    // --- TABLE ---
     doc.setDrawColor(200, 200, 200);
     doc.setFillColor(245, 245, 245);
     doc.rect(20, 88, 170, 10, 'F');
@@ -539,18 +578,38 @@ async function generatePDF(data, type = 'QUOTE', triggerNativeShare = false) {
     let y = 106;
     doc.setFont("helvetica", "normal");
     
-    if (data.breakdown.materialsList && data.breakdown.materialsList.length > 0) {
-        data.breakdown.materialsList.forEach(m => {
-            doc.text(`${m.qty ? m.qty + ' x ' : ''}${m.desc || 'Material'}`, 23, y);
-            if(m.cost > 0) doc.text(`£${m.cost.toFixed(2)}`, 170, y);
+    if (data.pricingModel === 'fixed') {
+        // Fixed Model Rendering
+        if (data.fixedData.matCost > 0 || data.fixedData.matDesc) {
+            doc.text(data.fixedData.matDesc || 'Materials', 23, y);
+            doc.text(`£${data.fixedData.matCost.toFixed(2)}`, 170, y);
             y += 8;
-        });
+        }
+        if (data.fixedData.labCost > 0 || data.fixedData.labDesc) {
+            doc.text(data.fixedData.labDesc || 'Labour / Installation', 23, y);
+            doc.text(`£${data.fixedData.labCost.toFixed(2)}`, 170, y);
+            y += 8;
+        }
+    } else {
+        // Breakdown Model Rendering
+        if (data.breakdown.materialsList && data.breakdown.materialsList.length > 0) {
+            data.breakdown.materialsList.forEach(m => {
+                doc.text(`${m.qty ? m.qty + ' x ' : ''}${m.desc || 'Material'}`, 23, y);
+                if(m.cost > 0) doc.text(`£${m.cost.toFixed(2)}`, 170, y);
+                y += 8;
+            });
+        }
+        if (data.breakdown.labour > 0) {
+            doc.text("Labour / Installation", 23, y);
+            doc.text(`£${data.breakdown.labour.toFixed(2)}`, 170, y);
+            y += 8;
+        }
     }
 
+    // Extras (Fuel/Misc are shown on both models if they exist)
     const remainingItems = [
         ["Fuel & Travel", data.breakdown.fuel],
-        ["Misc. Expenses", data.breakdown.misc],
-        ["Labour / Installation", data.breakdown.labour]
+        ["Misc. Expenses", data.breakdown.misc]
     ];
     remainingItems.forEach(item => {
         if (item[1] > 0) { 
@@ -560,7 +619,6 @@ async function generatePDF(data, type = 'QUOTE', triggerNativeShare = false) {
         }
     });
 
-    // --- TOTALS ---
     doc.line(120, y + 5, 190, y + 5);
     y += 15;
     doc.setFontSize(12);
@@ -580,7 +638,6 @@ async function generatePDF(data, type = 'QUOTE', triggerNativeShare = false) {
         doc.text(`£${(data.total - parseFloat(data.deposit)).toFixed(2)}`, 170, y);
     }
     
-    // --- PAYMENT BOX ---
     y += 20;
     doc.setFillColor(250, 250, 250);
     doc.setDrawColor(220, 220, 220);
@@ -613,7 +670,6 @@ async function generatePDF(data, type = 'QUOTE', triggerNativeShare = false) {
     doc.setTextColor(150, 150, 150);
     doc.text("Thank you for choosing D.N.L Joinery.", 105, 285, null, null, "center");
 
-    // Page 2: Terms
     doc.addPage();
     doc.setFillColor(...brandDark);
     doc.rect(0, 0, 210, 20, 'F');
