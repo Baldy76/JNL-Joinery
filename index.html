@@ -2,52 +2,123 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>David's Joinery App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>D.N.L Joinery</title>
+    
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#2563eb">
+    <meta name="theme-color" content="#f3f4f6">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="logo.png">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
+        .ios-input { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; width: 100%; font-size: 16px; outline: none; }
+        .ios-input:focus { border-color: #5c4033; box-shadow: 0 0 0 2px rgba(92,64,51,0.2); }
+        .view-section { display: none; }
+        .view-section.active { display: block; animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        /* Safe area padding for newer iPhones */
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
+        .pt-safe { padding-top: env(safe-area-inset-top, 40px); }
+    </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="bg-gray-100 h-screen flex flex-col overflow-hidden">
 
-    <nav class="bg-blue-600 p-4 text-white shadow-lg">
-        <h1 class="text-xl font-bold">David's Joinery</h1>
-    </nav>
+    <header class="bg-white shadow-sm pt-safe pb-3 px-4 flex justify-center items-center z-10 shrink-0">
+        <img src="logo.png" alt="D.N.L Logo" class="h-12 object-contain mr-3">
+        <h1 class="text-xl font-bold text-[#4a3728] tracking-wider">D·N·L JOINERY</h1>
+    </header>
 
-    <main class="p-4 max-w-md mx-auto">
-        <div class="bg-white p-6 rounded-xl shadow-md mb-6">
-            <h2 class="text-lg font-semibold mb-4 text-gray-700">Create New Quote</h2>
+    <main class="flex-1 overflow-y-auto p-4 pb-24 md:max-w-2xl md:mx-auto md:w-full">
+        
+        <section id="view-dashboard" class="view-section active">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Recent Quotes</h2>
+            <div id="quoteList" class="space-y-4">
+                </div>
+        </section>
+
+        <section id="view-new-quote" class="view-section">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Create Quote</h2>
             
-            <div class="space-y-4">
+            <div class="bg-white p-5 rounded-2xl shadow-sm mb-4 space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-600">Customer Name</label>
-                    <input type="text" id="custName" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    <label class="text-xs font-semibold text-gray-500 uppercase ml-1">Customer Name</label>
+                    <input type="text" id="custName" class="ios-input mt-1" placeholder="e.g. John Smith">
                 </div>
-                
                 <div>
-                    <label class="block text-sm font-medium text-gray-600">Job Description</label>
-                    <textarea id="jobDesc" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+                    <label class="text-xs font-semibold text-gray-500 uppercase ml-1">Job Description / Address</label>
+                    <textarea id="jobDesc" class="ios-input mt-1" rows="2" placeholder="e.g. Fitted wardrobes, 10 High St"></textarea>
                 </div>
+            </div>
 
+            <div class="bg-white p-5 rounded-2xl shadow-sm mb-4 space-y-4">
+                <h3 class="font-bold text-gray-700 border-b pb-2">Costs Breakdown</h3>
                 <div>
-                    <label class="block text-sm font-medium text-gray-600">Total Price (£)</label>
-                    <input type="number" id="jobPrice" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    <label class="text-xs font-semibold text-gray-500 uppercase ml-1">Materials (£)</label>
+                    <input type="number" id="costMaterials" class="ios-input mt-1 calc-trigger" placeholder="0.00">
                 </div>
+                <div class="flex space-x-4">
+                    <div class="flex-1">
+                        <label class="text-xs font-semibold text-gray-500 uppercase ml-1">Fuel (£)</label>
+                        <input type="number" id="costFuel" class="ios-input mt-1 calc-trigger" placeholder="0.00">
+                    </div>
+                    <div class="flex-1">
+                        <label class="text-xs font-semibold text-gray-500 uppercase ml-1">Expenses (£)</label>
+                        <input type="number" id="costMisc" class="ios-input mt-1 calc-trigger" placeholder="0.00">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-500 uppercase ml-1">Labour (£)</label>
+                    <input type="number" id="costLabour" class="ios-input mt-1 calc-trigger" placeholder="0.00">
+                </div>
+            </div>
 
-                <button onclick="generatePDF()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition">
-                    Generate PDF Quote
+            <div class="bg-[#4a3728] p-5 rounded-2xl shadow-md text-white mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <span class="text-lg font-medium">Grand Total</span>
+                    <span class="text-3xl font-bold" id="displayTotal">£0.00</span>
+                </div>
+                <button onclick="saveAndGenerate()" class="w-full bg-white text-[#4a3728] font-bold py-3 rounded-xl shadow-sm active:bg-gray-200 transition text-lg">
+                    Save & Create PDF
                 </button>
             </div>
-        </div>
+        </section>
 
-        <div id="status" class="text-center text-xs text-gray-500">
-            App ready for offline use.
-        </div>
+        <section id="view-admin" class="view-section">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Admin & Settings</h2>
+            <div class="bg-white p-5 rounded-2xl shadow-sm space-y-4">
+                <p class="text-gray-600 text-sm">App operates dynamically. It will automatically stretch to utilize the iPad Mini screen or compress for the iPhone.</p>
+                <hr>
+                <button onclick="clearDatabase()" class="w-full bg-red-100 text-red-600 font-bold py-3 rounded-xl active:bg-red-200 transition">
+                    Wipe Database (Clear All Quotes)
+                </button>
+            </div>
+        </section>
     </main>
+
+    <nav class="bg-white border-t border-gray-200 flex justify-around items-center pb-safe pt-2 absolute bottom-0 w-full z-10 shrink-0">
+        <button onclick="switchTab('dashboard')" class="flex flex-col items-center p-2 w-full text-[#4a3728] opacity-50 hover:opacity-100 tab-btn active-tab">
+            <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+            <span class="text-[10px] font-medium">Quotes</span>
+        </button>
+        <button onclick="switchTab('new-quote')" class="flex flex-col items-center p-2 w-full text-[#4a3728] opacity-50 hover:opacity-100 tab-btn">
+            <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+            <span class="text-[10px] font-medium">New Quote</span>
+        </button>
+        <button onclick="switchTab('admin')" class="flex flex-col items-center p-2 w-full text-[#4a3728] opacity-50 hover:opacity-100 tab-btn">
+            <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            <span class="text-[10px] font-medium">Admin</span>
+        </button>
+    </nav>
 
     <script src="app.js"></script>
     <script>
+        // Register Service Worker for PWA Offline functionality
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');
         }
