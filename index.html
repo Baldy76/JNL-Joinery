@@ -16,6 +16,8 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.5/dist/signature_pad.umd.min.js"></script>
 
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
@@ -26,7 +28,11 @@
         @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
         .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
         .pt-safe { padding-top: env(safe-area-inset-top, 40px); }
-        select { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E"); background-position: right 0.75rem center; background-repeat: no-repeat; background-size: 1.2em 1.2em; padding-right: 2.5rem; }
+        select { appearance: none; background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E"); background-position: right 0.75rem center; background-repeat: no-repeat; background-size: 1.2em 1.2em; padding-right: 2.5rem; }
+        /* Modal Backgrounds */
+        .modal-bg { display: none; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+        .modal-bg.active { display: flex; animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body class="bg-stone-100 h-screen flex flex-col overflow-hidden text-stone-800">
@@ -39,36 +45,57 @@
     <main class="flex-1 overflow-y-auto p-4 pb-28 md:max-w-2xl md:mx-auto md:w-full space-y-6">
         
         <section id="view-dashboard" class="view-section active">
-            <div class="flex justify-between items-center mb-6">
+            <div class="flex justify-between items-center mb-4">
                 <h2 class="text-3xl font-black text-[#4a3728]">My Jobs</h2>
-                <span class="bg-[#8b5a2b] text-white text-xs font-bold px-3 py-1 rounded-full"><i class="fa-solid fa-address-book mr-1"></i> CRM Active</span>
             </div>
+            
+            <div class="bg-gradient-to-r from-stone-800 to-stone-900 p-5 rounded-3xl shadow-lg mb-6 text-white flex justify-between items-center">
+                <div>
+                    <p class="text-stone-400 text-xs font-bold uppercase tracking-wider mb-1">Total Paid This Month</p>
+                    <p class="text-3xl font-black text-emerald-400" id="monthlyRevenue">£0.00</p>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-stone-700 flex items-center justify-center border-2 border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.3)]">
+                    <i class="fa-solid fa-chart-pie text-xl text-emerald-300"></i>
+                </div>
+            </div>
+
             <div id="quoteList" class="space-y-4"></div>
         </section>
 
         <section id="view-new-quote" class="view-section">
-            <h2 class="text-3xl font-black text-[#4a3728] mb-6"><i class="fa-solid fa-file-pen text-[#8b5a2b] mr-2"></i>New Quote</h2>
+            <h2 class="text-3xl font-black text-[#4a3728] mb-6"><i class="fa-solid fa-file-pen text-[#8b5a2b] mr-2"></i>New Document</h2>
             
             <div class="bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-stone-100 mb-6 space-y-4 relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-1 bg-blue-500"></div>
                 <div>
-                    <label class="text-xs font-bold text-stone-500 uppercase ml-1 tracking-wider"><i class="fa-solid fa-user text-blue-500 mr-2"></i>Customer Name</label>
+                    <label class="text-xs font-bold text-stone-500 uppercase ml-1 tracking-wider">Customer Name</label>
                     <input type="text" id="custName" list="clientList" class="ios-input mt-2" placeholder="e.g. John Smith" onchange="fillClientDetails()">
                     <datalist id="clientList"></datalist>
                 </div>
                 <div class="flex space-x-4">
                     <div class="flex-1">
-                        <label class="text-xs font-bold text-stone-500 uppercase ml-1 tracking-wider"><i class="fa-solid fa-phone text-blue-400 mr-2"></i>Phone</label>
+                        <label class="text-xs font-bold text-stone-500 uppercase ml-1 tracking-wider">Phone</label>
                         <input type="tel" id="custPhone" class="ios-input mt-2" placeholder="07...">
                     </div>
                     <div class="flex-1">
-                        <label class="text-xs font-bold text-stone-500 uppercase ml-1 tracking-wider"><i class="fa-solid fa-envelope text-blue-400 mr-2"></i>Email</label>
+                        <label class="text-xs font-bold text-stone-500 uppercase ml-1 tracking-wider">Email</label>
                         <input type="email" id="custEmail" class="ios-input mt-2" placeholder="@">
                     </div>
                 </div>
                 <div>
-                    <label class="text-xs font-bold text-stone-500 uppercase ml-1 tracking-wider"><i class="fa-solid fa-map-location-dot text-indigo-500 mr-2"></i>Job Description / Address</label>
-                    <textarea id="jobDesc" class="ios-input mt-2" rows="2" placeholder="e.g. Fitted wardrobes, 10 High St"></textarea>
+                    <div class="flex justify-between items-end">
+                        <label class="text-xs font-bold text-stone-500 uppercase ml-1 tracking-wider">Job Description</label>
+                        <button onclick="startDictation()" class="text-blue-500 bg-blue-50 px-3 py-1 rounded-full text-xs font-bold hover:bg-blue-100 transition"><i class="fa-solid fa-microphone mr-1"></i> Dictate</button>
+                    </div>
+                    <textarea id="jobDesc" class="ios-input mt-2" rows="2" placeholder="Describe the job..."></textarea>
+                </div>
+                
+                <div class="pt-2 border-t border-stone-50">
+                    <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="handlePhotoUpload(event)">
+                    <button onclick="document.getElementById('cameraInput').click()" class="w-full bg-stone-100 text-stone-600 font-bold py-3 rounded-xl border-2 border-dashed border-stone-300 active:bg-stone-200 transition flex items-center justify-center">
+                        <i class="fa-solid fa-camera mr-2"></i> Attach Site Snapshot
+                    </button>
+                    <img id="photoPreview" class="mt-3 rounded-xl max-h-32 mx-auto hidden shadow-md border border-stone-200">
                 </div>
             </div>
 
@@ -76,63 +103,50 @@
                 <div class="absolute top-0 left-0 w-full h-1 bg-amber-500"></div>
                 <div class="flex justify-between items-end border-b border-stone-100 pb-3 mb-4">
                     <h3 class="font-extrabold text-stone-700 text-lg"><i class="fa-solid fa-toolbox text-amber-500 mr-2"></i>Materials</h3>
-                    <div class="flex items-center">
-                        <label class="text-xs font-bold text-stone-500 mr-2 uppercase">Markup %</label>
-                        <input type="number" id="materialMarkup" class="ios-input w-20 py-1 px-2 text-center text-sm font-bold text-amber-700 calc-trigger" placeholder="0">
-                    </div>
+                    <button onclick="openCatalog()" class="text-amber-600 bg-amber-50 px-3 py-1 rounded-full text-xs font-bold border border-amber-100 shadow-sm active:scale-95"><i class="fa-solid fa-book-open mr-1"></i> Catalog</button>
+                </div>
+                <div class="flex justify-end mb-2">
+                    <label class="text-xs font-bold text-stone-500 mr-2 uppercase mt-1">Markup %</label>
+                    <input type="number" id="materialMarkup" class="ios-input w-20 py-1 px-2 text-center text-sm font-bold text-amber-700 calc-trigger" placeholder="0">
                 </div>
                 <div id="materialsContainer" class="space-y-3"></div>
                 <button onclick="addMaterialRow()" class="mt-5 text-sm font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 py-3 px-4 rounded-xl w-full transition transform active:scale-95 border border-amber-200">
-                    <i class="fa-solid fa-plus mr-1"></i> Add Another Material
+                    <i class="fa-solid fa-plus mr-1"></i> Add Manual Row
                 </button>
             </div>
 
             <div class="bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-stone-100 mb-6 space-y-5 relative overflow-hidden">
                 <div class="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
                 <h3 class="font-extrabold text-stone-700 text-lg border-b border-stone-100 pb-3"><i class="fa-solid fa-stopwatch text-emerald-500 mr-2"></i>Labour & Extra Costs</h3>
-                
                 <div class="flex space-x-4 bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100">
                     <div class="flex-1">
-                        <label class="text-xs font-bold text-emerald-800 uppercase ml-1"><i class="fa-regular fa-clock mr-1"></i>Est. Hours</label>
+                        <label class="text-xs font-bold text-emerald-800 uppercase ml-1">Est. Hours</label>
                         <input type="number" id="labourHours" class="ios-input mt-2 border-emerald-200 calc-trigger" placeholder="0">
                     </div>
                     <div class="flex-1">
-                        <label class="text-xs font-bold text-emerald-800 uppercase ml-1"><i class="fa-solid fa-sterling-sign mr-1"></i>Rate (/hr)</label>
+                        <label class="text-xs font-bold text-emerald-800 uppercase ml-1">Rate (/hr)</label>
                         <input type="number" id="labourRate" class="ios-input mt-2 border-emerald-200 calc-trigger" placeholder="0.00">
                     </div>
                 </div>
-
                 <div class="flex space-x-4">
                     <div class="flex-1">
-                        <label class="text-xs font-bold text-stone-500 uppercase ml-1 tracking-wider"><i class="fa-solid fa-gas-pump text-orange-400 mr-2"></i>Fuel (£)</label>
+                        <label class="text-xs font-bold text-stone-500 uppercase ml-1 tracking-wider">Fuel (£)</label>
                         <input type="number" id="costFuel" class="ios-input mt-2 calc-trigger" placeholder="0.00">
                     </div>
                     <div class="flex-1">
-                        <label class="text-xs font-bold text-stone-500 uppercase ml-1 tracking-wider"><i class="fa-solid fa-receipt text-purple-400 mr-2"></i>Misc (£)</label>
+                        <label class="text-xs font-bold text-stone-500 uppercase ml-1 tracking-wider">Misc (£)</label>
                         <input type="number" id="costMisc" class="ios-input mt-2 calc-trigger" placeholder="0.00">
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-stone-100 mb-6 space-y-4 relative overflow-hidden">
-                <div class="absolute top-0 left-0 w-full h-1 bg-rose-500"></div>
-                <h3 class="font-extrabold text-stone-700 text-lg border-b border-stone-100 pb-3"><i class="fa-solid fa-handshake text-rose-500 mr-2"></i>Payment Terms</h3>
-                <div class="flex space-x-4">
-                    <div class="flex-1">
-                        <label class="text-xs font-bold text-stone-500 uppercase ml-1 tracking-wider">Required Deposit</label>
-                        <div class="relative">
-                            <i class="fa-solid fa-sterling-sign absolute left-4 top-1/2 transform -translate-y-1/2 text-stone-400"></i>
-                            <input type="number" id="quoteDeposit" class="ios-input mt-2 pl-8" placeholder="0.00">
-                        </div>
-                    </div>
-                    <div class="flex-1">
-                        <label class="text-xs font-bold text-stone-500 uppercase ml-1 tracking-wider">Method</label>
-                        <select id="quotePaymentMethod" class="ios-input mt-2 bg-white font-medium">
-                            <option value="Bank Transfer">Bank Transfer</option>
-                            <option value="Cash">Cash</option>
-                        </select>
-                    </div>
-                </div>
+            <div class="bg-white p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-stone-100 mb-6 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1 bg-purple-500"></div>
+                <h3 class="font-extrabold text-stone-700 text-lg border-b border-stone-100 pb-3 mb-4"><i class="fa-solid fa-pen-nib text-purple-500 mr-2"></i>Client Approval</h3>
+                <button onclick="openSignature()" class="w-full bg-purple-50 text-purple-700 font-bold py-3 rounded-xl border border-purple-200 active:bg-purple-100 transition flex items-center justify-center">
+                    <i class="fa-solid fa-signature mr-2"></i> Collect Digital Signature
+                </button>
+                <img id="signaturePreview" class="mt-3 bg-white rounded-xl mx-auto hidden shadow-sm border border-stone-200 w-full max-h-24 object-contain">
             </div>
 
             <div class="bg-gradient-to-br from-[#4a3728] to-[#5c4033] p-6 rounded-3xl shadow-xl text-white mb-6 border border-[#6b4c3a]">
@@ -189,10 +203,34 @@
                 <button onclick="clearDatabase()" class="w-full bg-red-50 text-red-600 border border-red-200 font-bold py-4 rounded-2xl transform active:scale-95 transition">
                     Wipe Database (Delete Quotes & Clients)
                 </button>
-                <p class="text-center text-xs font-bold text-stone-400 mt-4 tracking-widest uppercase">Version 1.8</p>
+                <p class="text-center text-xs font-bold text-stone-400 mt-4 tracking-widest uppercase">Version 1.9 (Pro)</p>
             </div>
         </section>
     </main>
+
+    <div id="catalogModal" class="modal-bg fixed inset-0 z-50 items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 relative flex flex-col max-h-[80vh]">
+            <button onclick="closeCatalog()" class="absolute top-4 right-4 w-8 h-8 bg-stone-100 rounded-full text-stone-500 font-bold"><i class="fa-solid fa-times"></i></button>
+            <h3 class="text-xl font-black text-stone-800 mb-4"><i class="fa-solid fa-book-open text-amber-500 mr-2"></i>Timber Yard Catalog</h3>
+            <div id="catalogList" class="overflow-y-auto space-y-2 flex-1 pr-2">
+                </div>
+        </div>
+    </div>
+
+    <div id="sigModal" class="modal-bg fixed inset-0 z-50 items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 relative">
+            <h3 class="text-xl font-black text-stone-800 mb-2"><i class="fa-solid fa-pen-nib text-purple-500 mr-2"></i>Client Signature</h3>
+            <p class="text-xs text-stone-500 mb-4">Please sign below to approve the works and costs.</p>
+            <div class="border-2 border-dashed border-stone-300 rounded-xl bg-stone-50 overflow-hidden mb-4">
+                <canvas id="sigCanvas" class="w-full h-48 touch-none"></canvas>
+            </div>
+            <div class="flex space-x-3">
+                <button onclick="clearSignature()" class="flex-1 bg-stone-200 text-stone-700 font-bold py-3 rounded-xl active:bg-stone-300"><i class="fa-solid fa-eraser mr-1"></i> Clear</button>
+                <button onclick="saveSignature()" class="flex-1 bg-purple-600 text-white font-bold py-3 rounded-xl active:bg-purple-700 shadow-md"><i class="fa-solid fa-check mr-1"></i> Confirm</button>
+            </div>
+            <button onclick="closeSignature()" class="w-full mt-3 text-sm text-stone-500 font-bold py-2">Cancel</button>
+        </div>
+    </div>
 
     <nav class="bg-white/90 backdrop-blur-lg border-t border-stone-200 flex justify-around items-center pb-safe pt-2 absolute bottom-0 w-full z-20 shrink-0 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
         <button onclick="switchTab('dashboard')" class="flex flex-col items-center p-2 w-full text-stone-400 hover:text-[#4a3728] tab-btn active-tab transition-colors">
