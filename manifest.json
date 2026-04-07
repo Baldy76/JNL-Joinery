@@ -1,1 +1,16 @@
 
+{
+  "name": "David's Joinery",
+  "short_name": "Joinery",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192/2563eb/ffffff?text=DJ",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
