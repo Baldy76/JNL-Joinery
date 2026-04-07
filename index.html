@@ -17,7 +17,7 @@
 
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
-        .ios-input { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; width: 100%; font-size: 16px; outline: none; }
+        .ios-input { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; width: 100%; font-size: 14px; outline: none; }
         .ios-input:focus { border-color: #5c4033; box-shadow: 0 0 0 2px rgba(92,64,51,0.2); }
         .view-section { display: none; }
         .view-section.active { display: block; animation: fadeIn 0.3s ease-in-out; }
@@ -54,12 +54,21 @@
                 </div>
             </div>
 
-            <div class="bg-white p-5 rounded-2xl shadow-sm mb-4 space-y-4">
-                <h3 class="font-bold text-gray-700 border-b pb-2">Costs Breakdown</h3>
-                <div>
-                    <label class="text-xs font-semibold text-gray-500 uppercase ml-1">Materials (£)</label>
-                    <input type="number" id="costMaterials" class="ios-input mt-1 calc-trigger" placeholder="0.00">
+            <div class="bg-white p-5 rounded-2xl shadow-sm mb-4">
+                <div class="flex justify-between items-end border-b pb-2 mb-3">
+                    <h3 class="font-bold text-gray-700">Materials List</h3>
                 </div>
+                
+                <div id="materialsContainer" class="space-y-2">
+                    </div>
+
+                <button onclick="addMaterialRow()" class="mt-4 text-sm font-bold text-blue-600 bg-blue-50 py-2 px-4 rounded-lg w-full active:bg-blue-100">
+                    + Add Another Material
+                </button>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm mb-4 space-y-4">
+                <h3 class="font-bold text-gray-700 border-b pb-2">Additional Costs</h3>
                 <div class="flex space-x-4">
                     <div class="flex-1">
                         <label class="text-xs font-semibold text-gray-500 uppercase ml-1">Fuel (£)</label>
@@ -71,7 +80,7 @@
                     </div>
                 </div>
                 <div>
-                    <label class="text-xs font-semibold text-gray-500 uppercase ml-1">Labour (£)</label>
+                    <label class="text-xs font-semibold text-gray-500 uppercase ml-1">Labour Total (£)</label>
                     <input type="number" id="costLabour" class="ios-input mt-1 calc-trigger" placeholder="0.00">
                 </div>
             </div>
@@ -90,12 +99,10 @@
         <section id="view-admin" class="view-section">
             <h2 class="text-2xl font-bold text-gray-800 mb-4">Admin & Settings</h2>
             <div class="bg-white p-5 rounded-2xl shadow-sm space-y-4">
-                <p class="text-gray-600 text-sm">App operates dynamically. It will automatically stretch to utilize the iPad Mini screen or compress for the iPhone.</p>
-                <hr>
                 <button onclick="clearDatabase()" class="w-full bg-red-100 text-red-600 font-bold py-3 rounded-xl active:bg-red-200 transition">
                     Wipe Database (Clear All Quotes)
                 </button>
-                <p class="text-center text-xs text-gray-400 mt-4">App Version: 1.1</p>
+                <p class="text-center text-xs text-gray-400 mt-4">App Version: 1.2</p>
             </div>
         </section>
     </main>
