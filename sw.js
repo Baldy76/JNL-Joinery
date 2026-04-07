@@ -1,5 +1,5 @@
-// Version: 1.3 | Date: April 2026
-const cacheName = 'dnl-app-v1.3';
+// Version: 1.4 | Date: April 2026
+const cacheName = 'dnl-app-v1.4';
 const staticAssets = [
   './',
   './index.html',
