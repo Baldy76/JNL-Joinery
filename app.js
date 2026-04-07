@@ -1,14 +1,12 @@
+// Version: 1.1 | Date: April 2026
 // Initialize database
 const db = localforage.createInstance({ name: "DNL_DB" });
 
 // --- VIEW NAVIGATION (iOS Style) ---
 function switchTab(tabId) {
-    // Hide all views
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-    // Show selected view
     document.getElementById(`view-${tabId}`).classList.add('active');
     
-    // Update tab styling
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.add('opacity-50');
         btn.classList.remove('opacity-100', 'text-[#5c4033]');
@@ -57,14 +55,11 @@ async function saveAndGenerate() {
         total: total
     };
 
-    // Save to Phone/iPad Database
     await db.setItem(quoteData.id, quoteData);
     
-    // Clear form
     document.querySelectorAll('input, textarea').forEach(el => el.value = '');
     calculateTotal();
     
-    // Generate PDF and switch to dashboard
     generatePDF(quoteData);
     switchTab('dashboard');
 }
@@ -117,10 +112,8 @@ function generatePDF(data) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
-    // Brand Colors
     const brandDark = [74, 55, 40]; // #4a3728
     
-    // Header
     doc.setFillColor(...brandDark);
     doc.rect(0, 0, 210, 35, 'F');
     doc.setTextColor(255, 255, 255);
@@ -128,14 +121,12 @@ function generatePDF(data) {
     doc.setFont("helvetica", "bold");
     doc.text("D.N.L JOINERY & FENCING", 20, 22);
 
-    // Meta details
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.text(`QUOTE REF: ${data.id}`, 150, 50);
     doc.text(`DATE: ${data.date}`, 150, 55);
 
-    // Customer Info
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.text("PREPARED FOR:", 20, 50);
@@ -144,7 +135,6 @@ function generatePDF(data) {
     doc.setFontSize(10);
     doc.text(data.description, 20, 64, { maxWidth: 100 });
 
-    // Table Header
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.5);
     doc.line(20, 85, 190, 85);
@@ -153,7 +143,6 @@ function generatePDF(data) {
     doc.text("COST", 170, 92);
     doc.line(20, 96, 190, 96);
 
-    // Table Rows
     let y = 106;
     doc.setFont("helvetica", "normal");
     
@@ -165,29 +154,25 @@ function generatePDF(data) {
     ];
 
     items.forEach(item => {
-        if (item[1] > 0) { // Only print if cost > 0
+        if (item[1] > 0) { 
             doc.text(item[0], 20, y);
             doc.text(`£${item[1].toFixed(2)}`, 170, y);
             y += 10;
         }
     });
 
-    // Total Section
     doc.line(140, y + 5, 190, y + 5);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text("TOTAL DUE:", 130, y + 15);
     doc.text(`£${data.total.toFixed(2)}`, 170, y + 15);
 
-    // Footer
     doc.setFontSize(9);
     doc.setFont("helvetica", "italic");
     doc.setTextColor(150, 150, 150);
     doc.text("Thank you for choosing D.N.L Joinery. We appreciate your business.", 105, 280, null, null, "center");
 
-    // Save File
     doc.save(`DNL_Quote_${data.customer.replace(/\s+/g, '_')}.pdf`);
 }
 
-// Initial load
 window.onload = loadQuotes;
