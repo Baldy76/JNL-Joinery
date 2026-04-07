@@ -1,16 +1,17 @@
-// Version: 1.11 | Date: April 2026
+// Version: 1.12 | Date: April 2026
 const db = localforage.createInstance({ name: "DNL_DB" });
 
 let currentPhotoData = null;
 let currentSignatureData = null;
 let signaturePad = null;
 
+// --- VIEW NAVIGATION ---
 function switchTab(tabId) {
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
     document.getElementById(`view-${tabId}`).classList.add('active');
     
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active-tab'));
-    if(tabId !== 'new-quote') event.currentTarget.classList.add('active-tab');
+    event.currentTarget.classList.add('active-tab');
 
     if(tabId === 'dashboard') loadQuotes();
     
@@ -33,20 +34,31 @@ function switchTab(tabId) {
 window.addEventListener('DOMContentLoaded', () => {
     for(let i=0; i<3; i++) { addMaterialRow(); } 
     loadSettings();
-    initCatalog();
+    initCatalogUI(); // Now loads from DB
     const canvas = document.getElementById('sigCanvas');
     signaturePad = new SignaturePad(canvas, { backgroundColor: 'rgb(249, 250, 251)', penColor: '#4f46e5' });
 });
 
-// Voice Dictation
+// --- LABOUR TOGGLE ---
+function toggleLabourInputs() {
+    const type = document.getElementById('labourType').value;
+    if(type === 'hourly') {
+        document.getElementById('hourlyInputs').classList.remove('hidden');
+        document.getElementById('fixedInputs').classList.add('hidden');
+    } else {
+        document.getElementById('hourlyInputs').classList.add('hidden');
+        document.getElementById('fixedInputs').classList.remove('hidden');
+    }
+    calculateTotal();
+}
+
+// --- VOICE & MEDIA ---
 function startDictation() {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
         recognition.lang = 'en-GB';
-        
         if (navigator.vibrate) navigator.vibrate([30]); 
-        
         recognition.onresult = function(e) {
             const result = e.results[0][0].transcript;
             const descBox = document.getElementById('jobDesc');
@@ -59,7 +71,6 @@ function startDictation() {
     }
 }
 
-// Camera Upload
 function handlePhotoUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -73,7 +84,6 @@ function handlePhotoUpload(event) {
     reader.readAsDataURL(file);
 }
 
-// Digital Signature
 function openSignature() {
     document.getElementById('sigModal').classList.add('active');
     const canvas = document.getElementById('sigCanvas');
@@ -94,8 +104,8 @@ function saveSignature() {
     closeSignature();
 }
 
-// Catalog
-const catalogItems = [
+// --- DYNAMIC CATALOG (DB DRIVEN) ---
+const defaultCatalogItems = [
     { name: "2x4 Timber (2.4m)", cost: 5.50, icon: "🪵" },
     { name: "Sheet MDF (12mm)", cost: 18.00, icon: "🟫" },
     { name: "Box of Screws (x200)", cost: 4.50, icon: "🔩" },
@@ -103,19 +113,62 @@ const catalogItems = [
     { name: "Skirting Board (3m)", cost: 12.00, icon: "🪚" },
     { name: "Wood Glue (1L)", cost: 8.00, icon: "🧴" }
 ];
-function initCatalog() {
+
+async function loadCatalogData() {
+    let cat = await db.getItem('dnl_catalog');
+    if (!cat) {
+        cat = defaultCatalogItems;
+        await db.setItem('dnl_catalog', cat);
+    }
+    return cat;
+}
+
+async function initCatalogUI() {
+    const cat = await loadCatalogData();
+    
+    // 1. Build Quote Modal Catalog
     const list = document.getElementById('catalogList');
-    catalogItems.forEach(item => {
+    list.innerHTML = '';
+    cat.forEach(item => {
         const div = document.createElement('div');
-        div.className = "flex justify-between items-center bg-stone-50 p-4 rounded-2xl border-2 border-stone-100 cursor-pointer hover:border-amber-400 hover:bg-amber-50 active:scale-95 transition-all shadow-sm";
+        div.className = "flex justify-between items-center bg-stone-50 p-4 rounded-2xl border border-stone-200 cursor-pointer active:bg-amber-50 active:scale-95 transition-all shadow-sm";
         div.onclick = () => { selectCatalogItem(item.name, item.cost); };
         div.innerHTML = `
-            <div class="flex items-center"><div class="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-xl mr-3">${item.icon}</div><span class="font-black text-stone-700">${item.name}</span></div>
-            <span class="text-amber-600 font-black bg-amber-100 px-3 py-1 rounded-lg">£${item.cost.toFixed(2)}</span>
+            <div class="flex items-center"><div class="text-2xl mr-3">${item.icon}</div><span class="font-black text-stone-700">${item.name}</span></div>
+            <span class="text-stone-600 font-black px-2 py-1 rounded-lg bg-white border border-stone-200">£${item.cost.toFixed(2)}</span>
         `;
         list.appendChild(div);
     });
+
+    // 2. Build Admin Editor Catalog
+    const adminList = document.getElementById('adminCatalogContainer');
+    adminList.innerHTML = '';
+    cat.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = "flex justify-between items-center bg-stone-50 p-2 rounded-xl border border-stone-100";
+        div.innerHTML = `
+            <div class="flex items-center flex-1"><span class="text-lg mr-2">${item.icon}</span><span class="font-bold text-sm text-stone-600">${item.name}</span></div>
+            <div class="relative w-24">
+                <i class="fa-solid fa-sterling-sign absolute left-3 top-1/2 transform -translate-y-1/2 text-stone-400 text-xs"></i>
+                <input type="number" id="admin_cat_${index}" class="ios-input w-full pl-7 py-2 text-sm font-black text-stone-700" value="${item.cost}">
+            </div>
+        `;
+        adminList.appendChild(div);
+    });
 }
+
+async function saveAdminCatalog() {
+    const cat = await loadCatalogData();
+    cat.forEach((item, index) => {
+        const val = document.getElementById(`admin_cat_${index}`).value;
+        item.cost = parseFloat(val) || 0;
+    });
+    await db.setItem('dnl_catalog', cat);
+    initCatalogUI();
+    if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+    alert("Catalog prices updated.");
+}
+
 function openCatalog() { document.getElementById('catalogModal').classList.add('active'); }
 function closeCatalog() { document.getElementById('catalogModal').classList.remove('active'); }
 function selectCatalogItem(name, cost) {
@@ -125,7 +178,7 @@ function selectCatalogItem(name, cost) {
     if (navigator.vibrate) navigator.vibrate([20]); 
 }
 
-// Settings & Address Book
+// --- SETTINGS & ADDRESS BOOK ---
 async function loadSettings() {
     const settings = await db.getItem('dnl_settings');
     if(settings) {
@@ -172,7 +225,7 @@ async function saveToAddressBook(name, phone, email) {
     await db.setItem('dnl_clients', clients);
 }
 
-// Materials & Calculation
+// --- MATERIALS & MATH ---
 function addMaterialRow(qty = '', desc = '', cost = '') {
     const container = document.getElementById('materialsContainer');
     const row = document.createElement('div');
@@ -182,8 +235,8 @@ function addMaterialRow(qty = '', desc = '', cost = '') {
         <input type="text" class="ios-input w-16 text-center py-2 px-1 text-sm bg-white border-none shadow-sm mat-qty font-bold" placeholder="Qty" value="${qty}">
         <input type="text" class="ios-input flex-1 py-2 px-3 text-sm bg-white border-none shadow-sm mat-desc font-bold" placeholder="Item name" value="${desc}">
         <div class="relative w-24">
-            <i class="fa-solid fa-sterling-sign absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-500 text-xs"></i>
-            <input type="number" class="ios-input w-full mat-cost calc-trigger pl-7 py-2 text-sm font-black text-emerald-700 bg-emerald-50 border-none shadow-sm" placeholder="0.00" value="${cost}">
+            <i class="fa-solid fa-sterling-sign absolute left-3 top-1/2 transform -translate-y-1/2 text-amber-500 text-xs"></i>
+            <input type="number" class="ios-input w-full mat-cost calc-trigger pl-7 py-2 text-sm font-black text-amber-700 bg-amber-50 border-none shadow-sm" placeholder="0.00" value="${cost}">
         </div>
     `;
     if(desc) container.insertBefore(row, container.firstChild);
@@ -206,10 +259,19 @@ function calculateTotal() {
     
     const fuel = parseFloat(document.getElementById('costFuel').value) || 0;
     const misc = parseFloat(document.getElementById('costMisc').value) || 0;
-    const hours = parseFloat(document.getElementById('labourHours').value) || 0;
-    const rate = parseFloat(document.getElementById('labourRate').value) || 0;
     
-    const total = matTotal + fuel + misc + (hours * rate);
+    // Check Labour Type
+    let labTotal = 0;
+    const lType = document.getElementById('labourType').value;
+    if(lType === 'hourly') {
+        const hours = parseFloat(document.getElementById('labourHours').value) || 0;
+        const rate = parseFloat(document.getElementById('labourRate').value) || 0;
+        labTotal = hours * rate;
+    } else {
+        labTotal = parseFloat(document.getElementById('labourFixed').value) || 0;
+    }
+    
+    const total = matTotal + fuel + misc + labTotal;
     document.getElementById('displayTotal').innerText = `£${total.toFixed(2)}`;
     return total;
 }
@@ -218,12 +280,7 @@ function calculateTotal() {
 function clearQuoteForm() {
     if(!confirm("Are you sure you want to clear this quote? All unsaved details will be lost.")) return;
     
-    // Clear standard inputs
-    document.querySelectorAll('#view-new-quote input, #view-new-quote textarea').forEach(el => {
-        el.value = '';
-    });
-    
-    // Clear UI elements
+    document.querySelectorAll('#view-new-quote input, #view-new-quote textarea').forEach(el => { el.value = ''; });
     document.getElementById('photoPreview').classList.add('hidden');
     document.getElementById('photoPreview').src = '';
     currentPhotoData = null;
@@ -233,18 +290,18 @@ function clearQuoteForm() {
     currentSignatureData = null;
     if(signaturePad) signaturePad.clear();
 
-    // Reset materials list to default 3 blanks
+    document.getElementById('labourType').value = 'hourly';
+    toggleLabourInputs();
+
     document.getElementById('materialsContainer').innerHTML = '';
     for(let i=0; i<3; i++) { addMaterialRow(); } 
     
-    // Restore default settings (rate & markup)
     loadSettings(); 
     calculateTotal();
-    
     if (navigator.vibrate) navigator.vibrate([20, 20]);
 }
 
-// Save & Create
+// --- SAVE & PDF ---
 async function saveAndGenerate() {
     const name = document.getElementById('custName').value;
     if (!name) {
@@ -267,8 +324,13 @@ async function saveAndGenerate() {
         }
     });
 
-    const hours = parseFloat(document.getElementById('labourHours').value) || 0;
-    const rate = parseFloat(document.getElementById('labourRate').value) || 0;
+    let labTotal = 0;
+    const lType = document.getElementById('labourType').value;
+    if(lType === 'hourly') {
+        labTotal = (parseFloat(document.getElementById('labourHours').value) || 0) * (parseFloat(document.getElementById('labourRate').value) || 0);
+    } else {
+        labTotal = parseFloat(document.getElementById('labourFixed').value) || 0;
+    }
 
     const quoteData = {
         id: `DNL-${Math.floor(Math.random() * 10000)}`,
@@ -283,7 +345,7 @@ async function saveAndGenerate() {
             materials: matTotalCost,
             fuel: parseFloat(document.getElementById('costFuel').value) || 0,
             misc: parseFloat(document.getElementById('costMisc').value) || 0,
-            labour: hours * rate,
+            labour: labTotal,
         },
         total: calculateTotal(),
         deposit: parseFloat(document.getElementById('quoteDeposit').value) || 0,
@@ -296,6 +358,8 @@ async function saveAndGenerate() {
     await db.setItem(quoteData.id, quoteData);
     
     document.querySelectorAll('input:not(#bankName, #bankSort, #bankAcc, #defaultRate, #defaultMarkup), textarea').forEach(el => el.value = '');
+    document.getElementById('labourType').value = 'hourly';
+    toggleLabourInputs();
     document.getElementById('materialsContainer').innerHTML = '';
     for(let i=0; i<3; i++) { addMaterialRow(); } 
     loadSettings(); 
@@ -304,7 +368,7 @@ async function saveAndGenerate() {
     switchTab('dashboard');
 }
 
-// Dashboard & Status
+// --- DASHBOARD ---
 async function updateStatus(id, newStatus) {
     const quote = await db.getItem(id);
     const oldStatus = quote.status;
@@ -322,48 +386,35 @@ async function loadQuotes() {
     const list = document.getElementById('quoteList');
     list.innerHTML = '';
     let keys = await db.keys();
-    const quoteKeys = keys.filter(k => k !== 'dnl_settings' && k !== 'dnl_clients');
+    const quoteKeys = keys.filter(k => k !== 'dnl_settings' && k !== 'dnl_clients' && k !== 'dnl_catalog');
     
     let monthlyRevenue = 0;
     const currentMonth = new Date().getMonth();
 
     if (quoteKeys.length === 0) {
-        list.innerHTML = `<div class="text-center mt-20 p-6 bg-white rounded-3xl shadow-sm border-2 border-dashed border-stone-200"><i class="fa-solid fa-box-open text-6xl text-stone-200 mb-4 block"></i><p class="font-black text-stone-500 text-lg">It's quiet in here.</p><p class="text-sm font-bold text-stone-400 mt-2">Tap the big + button to start your first job.</p></div>`;
+        list.innerHTML = `<div class="text-center mt-10 p-6 bg-white rounded-3xl shadow-sm border border-stone-200"><p class="font-black text-stone-500">No jobs yet.</p></div>`;
         document.getElementById('monthlyRevenue').innerText = "£0.00";
         return;
     }
 
     for (let key of quoteKeys.reverse()) {
         const quote = await db.getItem(key);
-        
         const quoteDate = new Date(quote.date.split('/').reverse().join('-')); 
-        if(quote.status === 'Paid' && quoteDate.getMonth() === currentMonth) {
-            monthlyRevenue += quote.total;
-        }
-
+        if(quote.status === 'Paid' && quoteDate.getMonth() === currentMonth) monthlyRevenue += quote.total;
+        
         const status = quote.status || 'Draft';
-        
-        let cardBg = '', iconBg = '', iconColor = '', iconObj = '';
-        if(status === 'Paid') { cardBg = 'from-emerald-50 to-white border-emerald-200'; iconBg = 'bg-emerald-500'; iconColor = 'text-white'; iconObj = 'fa-sack-dollar'; }
-        else if(status === 'Accepted') { cardBg = 'from-indigo-50 to-white border-indigo-200'; iconBg = 'bg-indigo-500'; iconColor = 'text-white'; iconObj = 'fa-handshake'; }
-        else if(status === 'Sent') { cardBg = 'from-blue-50 to-white border-blue-200'; iconBg = 'bg-blue-500'; iconColor = 'text-white'; iconObj = 'fa-paper-plane'; }
-        else { cardBg = 'from-stone-50 to-white border-stone-200'; iconBg = 'bg-stone-300'; iconColor = 'text-stone-600'; iconObj = 'fa-pen-ruler'; }
-        
         const card = document.createElement('div');
-        card.className = `bg-gradient-to-br ${cardBg} p-5 rounded-3xl shadow-[0_8px_20px_rgba(0,0,0,0.03)] border-2 flex flex-col relative transition-all`;
+        card.className = `bg-white p-5 rounded-3xl shadow-sm border border-stone-200 flex flex-col relative mb-4`;
         
         card.innerHTML = `
             <div class="flex justify-between items-start mb-4">
-                <div class="flex items-center">
-                    <div class="${iconBg} ${iconColor} w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-md mr-4 transform -rotate-3"><i class="fa-solid ${iconObj}"></i></div>
-                    <div>
-                        <h4 class="font-black text-lg text-stone-800 leading-tight">${quote.customer}</h4>
-                        <p class="text-[10px] font-black text-stone-400 mt-1 uppercase tracking-widest">${quote.date} &nbsp;•&nbsp; ${quote.id.replace('DNL-','')}</p>
-                    </div>
+                <div>
+                    <h4 class="font-black text-lg text-stone-800 leading-tight">${quote.customer}</h4>
+                    <p class="text-[10px] font-black text-stone-400 mt-1 uppercase tracking-widest">${quote.date} &nbsp;•&nbsp; ${quote.id.replace('DNL-','')}</p>
                 </div>
                 <div class="text-right">
-                    <p class="font-black text-2xl text-stone-800 tracking-tighter">£${quote.total.toFixed(2)}</p>
-                    <select onchange="updateStatus('${quote.id}', this.value)" class="text-xs mt-1 py-1 px-3 rounded-full border outline-none font-black bg-white shadow-sm cursor-pointer text-stone-600 appearance-none text-center block w-full">
+                    <p class="font-black text-2xl text-[#4a3728] tracking-tighter">£${quote.total.toFixed(2)}</p>
+                    <select onchange="updateStatus('${quote.id}', this.value)" class="text-xs mt-1 py-1 px-3 rounded-full border outline-none font-black bg-stone-50 cursor-pointer text-stone-600 appearance-none text-center block w-full">
                         <option value="Draft" ${status==='Draft'?'selected':''}>🟡 Draft</option>
                         <option value="Sent" ${status==='Sent'?'selected':''}>🔵 Sent</option>
                         <option value="Accepted" ${status==='Accepted'?'selected':''}>🟣 Accepted</option>
@@ -371,29 +422,26 @@ async function loadQuotes() {
                     </select>
                 </div>
             </div>
-            
             <div class="flex space-x-2 mt-2">
-                <button onclick="generatePDF(await db.getItem('${quote.id}'), 'QUOTE', false)" class="flex-1 text-xs text-stone-700 bg-white hover:bg-stone-50 py-3 rounded-2xl font-black shadow-sm border border-stone-100 active:scale-95 transition"><i class="fa-solid fa-file-invoice mr-1 text-blue-500"></i> Quote</button>
-                <button onclick="generatePDF(await db.getItem('${quote.id}'), 'INVOICE', false)" class="flex-1 text-xs text-stone-700 bg-white hover:bg-stone-50 py-3 rounded-2xl font-black shadow-sm border border-stone-100 active:scale-95 transition"><i class="fa-solid fa-receipt mr-1 text-emerald-500"></i> Invoice</button>
+                <button onclick="generatePDF(await db.getItem('${quote.id}'), 'QUOTE', false)" class="flex-1 text-xs text-stone-700 bg-stone-100 hover:bg-stone-200 py-3 rounded-2xl font-black transition"><i class="fa-solid fa-file-invoice mr-1 text-blue-500"></i> Quote</button>
+                <button onclick="generatePDF(await db.getItem('${quote.id}'), 'INVOICE', false)" class="flex-1 text-xs text-stone-700 bg-stone-100 hover:bg-stone-200 py-3 rounded-2xl font-black transition"><i class="fa-solid fa-receipt mr-1 text-emerald-500"></i> Invoice</button>
             </div>
-            
-            <div class="flex justify-between items-center mt-3 pt-3 border-t border-white/50">
+            <div class="flex justify-between items-center mt-3 pt-3 border-t border-stone-100">
                 <div class="flex space-x-2">
-                    <button onclick="sendQuickMessage('${quote.id}', 'whatsapp')" class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center hover:bg-green-200 transition shadow-inner"><i class="fa-brands fa-whatsapp text-xl"></i></button>
-                    <button onclick="sendQuickMessage('${quote.id}', 'sms')" class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center hover:bg-blue-200 transition shadow-inner"><i class="fa-solid fa-comment-sms text-lg"></i></button>
+                    <button onclick="sendQuickMessage('${quote.id}', 'whatsapp')" class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center"><i class="fa-brands fa-whatsapp text-xl"></i></button>
+                    <button onclick="sendQuickMessage('${quote.id}', 'sms')" class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center"><i class="fa-solid fa-comment-sms text-lg"></i></button>
                 </div>
-                <button onclick="generatePDF(await db.getItem('${quote.id}'), 'QUOTE', true)" class="px-5 h-10 rounded-full bg-stone-800 text-white flex items-center justify-center text-xs font-black shadow-lg active:scale-95 transition"><i class="fa-solid fa-arrow-up-from-bracket mr-2"></i> Share</button>
+                <button onclick="generatePDF(await db.getItem('${quote.id}'), 'QUOTE', true)" class="px-5 h-10 rounded-full bg-[#4a3728] text-white flex items-center justify-center text-xs font-black shadow-md"><i class="fa-solid fa-share-nodes mr-2"></i> Share PDF</button>
             </div>
         `;
         list.appendChild(card);
     }
-    
     document.getElementById('monthlyRevenue').innerText = `£${monthlyRevenue.toFixed(2)}`;
 }
 
 async function sendQuickMessage(id, platform) {
     const quote = await db.getItem(id);
-    const msg = `Hi ${quote.customer}, I have prepared your document for the joinery work. The total is £${quote.total.toFixed(2)}. I will send the PDF over to you now. Thanks, D.N.L Joinery.`;
+    const msg = `Hi ${quote.customer}, here is the document for the joinery work. Total: £${quote.total.toFixed(2)}. I'll send the PDF now. Thanks, D.N.L Joinery.`;
     if (platform === 'whatsapp') window.open(`https://wa.me/${quote.phone?quote.phone.replace(/^0/,'+44').replace(/\s/g,''):''}?text=${encodeURIComponent(msg)}`, '_blank');
     else if (platform === 'sms') window.open(`sms:${quote.phone || ''}?&body=${encodeURIComponent(msg)}`, '_self');
 }
@@ -401,13 +449,15 @@ async function sendQuickMessage(id, platform) {
 async function clearDatabase() {
     if(confirm("DANGER: This will delete everything!")) {
         const settings = await db.getItem('dnl_settings');
+        const cat = await db.getItem('dnl_catalog');
         await db.clear();
         if(settings) await db.setItem('dnl_settings', settings);
+        if(cat) await db.setItem('dnl_catalog', cat);
         loadQuotes();
     }
 }
 
-// PDF Generator
+// --- PDF GENERATOR ---
 async function generatePDF(data, type = 'QUOTE', triggerNativeShare = false) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
