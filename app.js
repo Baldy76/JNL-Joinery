@@ -1,4 +1,4 @@
-// Version: 1.2 | Date: April 2026
+// Version: 1.3 | Date: April 2026
 const db = localforage.createInstance({ name: "DNL_DB" });
 
 // --- VIEW NAVIGATION ---
@@ -14,6 +14,26 @@ function switchTab(tabId) {
     event.currentTarget.classList.add('opacity-100', 'text-[#5c4033]');
 
     if(tabId === 'dashboard') loadQuotes();
+}
+
+// --- SETTINGS (ADMIN) ---
+async function loadSettings() {
+    const settings = await db.getItem('dnl_settings');
+    if(settings) {
+        document.getElementById('bankName').value = settings.bankName || '';
+        document.getElementById('bankSort').value = settings.bankSort || '';
+        document.getElementById('bankAcc').value = settings.bankAcc || '';
+    }
+}
+
+async function saveSettings() {
+    const settings = {
+        bankName: document.getElementById('bankName').value,
+        bankSort: document.getElementById('bankSort').value,
+        bankAcc: document.getElementById('bankAcc').value
+    };
+    await db.setItem('dnl_settings', settings);
+    alert("Bank details saved successfully.");
 }
 
 // --- DYNAMIC MATERIALS LIST ---
@@ -32,17 +52,15 @@ function addMaterialRow() {
 
 function bindCalcTriggers() {
     document.querySelectorAll('.calc-trigger').forEach(input => {
-        // Remove old listeners to prevent duplicates, then add new
         input.removeEventListener('input', calculateTotal);
         input.addEventListener('input', calculateTotal);
     });
 }
 
-// Initialize exactly 5 empty material rows on load
 window.addEventListener('DOMContentLoaded', () => {
     for(let i=0; i<5; i++) { addMaterialRow(); }
+    loadSettings();
 });
-
 
 // --- CALCULATIONS ---
 function calculateTotal() {
@@ -65,10 +83,11 @@ async function saveAndGenerate() {
     const name = document.getElementById('custName').value;
     const desc = document.getElementById('jobDesc').value;
     const total = calculateTotal();
+    const deposit = parseFloat(document.getElementById('quoteDeposit').value) || 0;
+    const paymentMethod = document.getElementById('quotePaymentMethod').value;
 
     if (!name) return alert("Please enter a customer name.");
 
-    // Gather Materials
     const materialsList = [];
     let matTotalCost = 0;
     document.querySelectorAll('.material-row').forEach(row => {
@@ -89,18 +108,19 @@ async function saveAndGenerate() {
         description: desc,
         breakdown: {
             materialsList: materialsList,
-            materials: matTotalCost, // Saved for backward compatibility
+            materials: matTotalCost,
             fuel: parseFloat(document.getElementById('costFuel').value) || 0,
             misc: parseFloat(document.getElementById('costMisc').value) || 0,
             labour: parseFloat(document.getElementById('costLabour').value) || 0
         },
-        total: total
+        total: total,
+        deposit: deposit,
+        paymentMethod: paymentMethod
     };
 
     await db.setItem(quoteData.id, quoteData);
     
-    // Clear form
-    document.querySelectorAll('input, textarea').forEach(el => el.value = '');
+    document.querySelectorAll('input:not(#bankName, #bankSort, #bankAcc), textarea').forEach(el => el.value = '');
     calculateTotal();
     
     generatePDF(quoteData);
@@ -113,12 +133,14 @@ async function loadQuotes() {
     list.innerHTML = '';
     let keys = await db.keys();
     
-    if (keys.length === 0) {
+    const quoteKeys = keys.filter(k => k !== 'dnl_settings');
+
+    if (quoteKeys.length === 0) {
         list.innerHTML = '<p class="text-gray-400 text-center mt-10">No quotes saved yet.</p>';
         return;
     }
 
-    for (let key of keys) {
+    for (let key of quoteKeys) {
         const quote = await db.getItem(key);
         const card = document.createElement('div');
         card.className = "bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center";
@@ -144,14 +166,18 @@ async function reprintPDF(id) {
 // --- ADMIN ---
 async function clearDatabase() {
     if(confirm("Are you sure? This will delete all saved quotes from this device.")) {
+        // Only clear quotes, preserve settings
+        const settings = await db.getItem('dnl_settings');
         await db.clear();
+        if(settings) await db.setItem('dnl_settings', settings);
+        
         loadQuotes();
-        alert("Database cleared.");
+        alert("Database cleared (Bank details preserved).");
     }
 }
 
 // --- PDF GENERATOR ---
-function generatePDF(data) {
+async function generatePDF(data) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     const brandDark = [74, 55, 40]; 
@@ -188,7 +214,6 @@ function generatePDF(data) {
     let y = 106;
     doc.setFont("helvetica", "normal");
     
-    // Check if new v1.2 material list exists
     if (data.breakdown.materialsList && data.breakdown.materialsList.length > 0) {
         data.breakdown.materialsList.forEach(m => {
             const lineText = `${m.qty ? m.qty + ' x ' : ''}${m.desc || 'Material'}`;
@@ -196,14 +221,8 @@ function generatePDF(data) {
             if(m.cost > 0) doc.text(`£${m.cost.toFixed(2)}`, 170, y);
             y += 10;
         });
-    } else if (data.breakdown.materials > 0) {
-        // Fallback for older v1.1 quotes
-        doc.text("Materials", 20, y);
-        doc.text(`£${data.breakdown.materials.toFixed(2)}`, 170, y);
-        y += 10;
     }
 
-    // Add remaining fixed costs
     const remainingItems = [
         ["Fuel & Travel", data.breakdown.fuel],
         ["Misc. Expenses", data.breakdown.misc],
@@ -218,11 +237,51 @@ function generatePDF(data) {
         }
     });
 
-    doc.line(140, y + 5, 190, y + 5);
-    doc.setFontSize(14);
+    doc.line(120, y + 5, 190, y + 5);
+    
+    // --- FINANCIAL SUMMARY ---
+    y += 15;
+    doc.setFontSize(12);
+    doc.text("GRAND TOTAL:", 120, y);
+    doc.text(`£${data.total.toFixed(2)}`, 170, y);
+    
+    if (data.deposit && data.deposit > 0) {
+        y += 8;
+        doc.text("DEPOSIT REQUIRED:", 120, y);
+        doc.text(`£${parseFloat(data.deposit).toFixed(2)}`, 170, y);
+        
+        y += 8;
+        doc.setFont("helvetica", "bold");
+        const balance = data.total - parseFloat(data.deposit);
+        doc.text("REMAINING BALANCE:", 120, y);
+        doc.text(`£${balance.toFixed(2)}`, 170, y);
+    }
+    
+    // --- PAYMENT INSTRUCTIONS ---
+    y += 20;
     doc.setFont("helvetica", "bold");
-    doc.text("TOTAL DUE:", 130, y + 15);
-    doc.text(`£${data.total.toFixed(2)}`, 170, y + 15);
+    doc.setFontSize(10);
+    doc.text("PAYMENT INSTRUCTIONS:", 20, y);
+    
+    doc.setFont("helvetica", "normal");
+    y += 6;
+    const method = data.paymentMethod || "Cash";
+    doc.text(`Preferred Payment Method: ${method}`, 20, y);
+
+    if (method === "Bank Transfer") {
+        const settings = await db.getItem('dnl_settings');
+        if (settings && settings.bankName) {
+            y += 6;
+            doc.text(`Account Name: ${settings.bankName}`, 20, y);
+            y += 6;
+            doc.text(`Sort Code: ${settings.bankSort}`, 20, y);
+            y += 6;
+            doc.text(`Account No: ${settings.bankAcc}`, 20, y);
+        } else {
+            y += 6;
+            doc.text("Please contact us for bank details.", 20, y);
+        }
+    }
 
     doc.setFontSize(9);
     doc.setFont("helvetica", "italic");
@@ -231,5 +290,3 @@ function generatePDF(data) {
 
     doc.save(`DNL_Quote_${data.customer.replace(/\s+/g, '_')}.pdf`);
 }
-
-window.onload = loadQuotes;
