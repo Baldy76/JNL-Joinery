@@ -202,8 +202,11 @@
                     <span class="text-sm font-black text-orange-100 uppercase tracking-widest">Grand Total</span>
                     <span class="text-5xl font-black tracking-tighter" id="displayTotal">£0.00</span>
                 </div>
-                <button onclick="saveAndGenerate()" class="w-full bg-white text-[#8b5a2b] font-black py-4 rounded-2xl shadow-xl transform active:scale-95 transition-all text-xl flex items-center justify-center animate-pulse">
+                <button onclick="saveAndGenerate()" class="w-full bg-white text-[#8b5a2b] font-black py-4 rounded-2xl shadow-xl transform active:scale-95 transition-all text-xl flex items-center justify-center animate-pulse mb-3">
                     <i class="fa-solid fa-file-pdf text-red-500 mr-2 text-2xl"></i> Finish & Create
+                </button>
+                <button onclick="clearQuoteForm()" class="w-full bg-orange-700/30 hover:bg-orange-700/50 text-orange-50 font-bold py-3 rounded-2xl transform active:scale-95 transition flex items-center justify-center border border-orange-400/30">
+                    <i class="fa-solid fa-trash-can mr-2"></i> Clear Form
                 </button>
             </div>
         </section>
@@ -259,7 +262,7 @@
                 <button onclick="clearDatabase()" class="w-full bg-white text-red-600 border-2 border-red-200 font-black py-4 rounded-2xl transform active:scale-95 transition shadow-sm hover:bg-red-600 hover:text-white">
                     Factory Reset (Delete All)
                 </button>
-                <p class="text-center text-xs font-black text-red-300 mt-2 tracking-widest uppercase">Version 1.10</p>
+                <p class="text-center text-xs font-black text-red-300 mt-2 tracking-widest uppercase">Version 1.11</p>
             </div>
         </section>
     </main>
@@ -268,8 +271,7 @@
         <div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-6 relative flex flex-col max-h-[85vh] border-4 border-amber-400">
             <button onclick="closeCatalog()" class="absolute -top-4 -right-4 w-10 h-10 bg-stone-800 text-white rounded-full font-bold shadow-lg border-2 border-white"><i class="fa-solid fa-times"></i></button>
             <h3 class="text-2xl font-black text-stone-800 mb-6 flex items-center"><div class="icon-box bg-amber-100 text-amber-500 mr-3"><i class="fa-solid fa-layer-group"></i></div> Timber Yard</h3>
-            <div id="catalogList" class="overflow-y-auto space-y-3 flex-1 pr-2">
-                </div>
+            <div id="catalogList" class="overflow-y-auto space-y-3 flex-1 pr-2"></div>
         </div>
     </div>
 
