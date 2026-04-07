@@ -1,10 +1,10 @@
-
-const cacheName = 'joinery-v1';
+const cacheName = 'dnl-app-v2';
 const staticAssets = [
   './',
   './index.html',
   './app.js',
-  './manifest.json'
+  './manifest.json',
+  './logo.png'
 ];
 
 self.addEventListener('install', async e => {
