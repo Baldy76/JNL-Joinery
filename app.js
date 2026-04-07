@@ -1,8 +1,7 @@
-// Version: 1.1 | Date: April 2026
-// Initialize database
+// Version: 1.2 | Date: April 2026
 const db = localforage.createInstance({ name: "DNL_DB" });
 
-// --- VIEW NAVIGATION (iOS Style) ---
+// --- VIEW NAVIGATION ---
 function switchTab(tabId) {
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
     document.getElementById(`view-${tabId}`).classList.add('active');
@@ -17,18 +16,46 @@ function switchTab(tabId) {
     if(tabId === 'dashboard') loadQuotes();
 }
 
-// --- CALCULATIONS ---
-document.querySelectorAll('.calc-trigger').forEach(input => {
-    input.addEventListener('input', calculateTotal);
+// --- DYNAMIC MATERIALS LIST ---
+function addMaterialRow() {
+    const container = document.getElementById('materialsContainer');
+    const row = document.createElement('div');
+    row.className = 'flex space-x-2 material-row';
+    row.innerHTML = `
+        <input type="text" class="ios-input w-16 mat-qty" placeholder="Qty">
+        <input type="text" class="ios-input flex-1 mat-desc" placeholder="Item (e.g. Posts)">
+        <input type="number" class="ios-input w-24 mat-cost calc-trigger" placeholder="Cost £">
+    `;
+    container.appendChild(row);
+    bindCalcTriggers();
+}
+
+function bindCalcTriggers() {
+    document.querySelectorAll('.calc-trigger').forEach(input => {
+        // Remove old listeners to prevent duplicates, then add new
+        input.removeEventListener('input', calculateTotal);
+        input.addEventListener('input', calculateTotal);
+    });
+}
+
+// Initialize exactly 5 empty material rows on load
+window.addEventListener('DOMContentLoaded', () => {
+    for(let i=0; i<5; i++) { addMaterialRow(); }
 });
 
+
+// --- CALCULATIONS ---
 function calculateTotal() {
-    const mat = parseFloat(document.getElementById('costMaterials').value) || 0;
+    let matTotal = 0;
+    document.querySelectorAll('.mat-cost').forEach(input => {
+        matTotal += parseFloat(input.value) || 0;
+    });
+    
     const fuel = parseFloat(document.getElementById('costFuel').value) || 0;
     const misc = parseFloat(document.getElementById('costMisc').value) || 0;
     const lab = parseFloat(document.getElementById('costLabour').value) || 0;
     
-    const total = mat + fuel + misc + lab;
+    const total = matTotal + fuel + misc + lab;
     document.getElementById('displayTotal').innerText = `£${total.toFixed(2)}`;
     return total;
 }
@@ -41,13 +68,28 @@ async function saveAndGenerate() {
 
     if (!name) return alert("Please enter a customer name.");
 
+    // Gather Materials
+    const materialsList = [];
+    let matTotalCost = 0;
+    document.querySelectorAll('.material-row').forEach(row => {
+        const qty = row.querySelector('.mat-qty').value;
+        const mDesc = row.querySelector('.mat-desc').value;
+        const cost = parseFloat(row.querySelector('.mat-cost').value) || 0;
+        
+        if (qty || mDesc || cost) {
+            materialsList.push({ qty, desc: mDesc, cost });
+            matTotalCost += cost;
+        }
+    });
+
     const quoteData = {
         id: `DNL-${Math.floor(Math.random() * 10000)}`,
         date: new Date().toLocaleDateString(),
         customer: name,
         description: desc,
         breakdown: {
-            materials: parseFloat(document.getElementById('costMaterials').value) || 0,
+            materialsList: materialsList,
+            materials: matTotalCost, // Saved for backward compatibility
             fuel: parseFloat(document.getElementById('costFuel').value) || 0,
             misc: parseFloat(document.getElementById('costMisc').value) || 0,
             labour: parseFloat(document.getElementById('costLabour').value) || 0
@@ -57,6 +99,7 @@ async function saveAndGenerate() {
 
     await db.setItem(quoteData.id, quoteData);
     
+    // Clear form
     document.querySelectorAll('input, textarea').forEach(el => el.value = '');
     calculateTotal();
     
@@ -64,12 +107,12 @@ async function saveAndGenerate() {
     switchTab('dashboard');
 }
 
-// --- DASHBOARD (LOAD QUOTES) ---
+// --- DASHBOARD ---
 async function loadQuotes() {
     const list = document.getElementById('quoteList');
     list.innerHTML = '';
-    
     let keys = await db.keys();
+    
     if (keys.length === 0) {
         list.innerHTML = '<p class="text-gray-400 text-center mt-10">No quotes saved yet.</p>';
         return;
@@ -98,7 +141,7 @@ async function reprintPDF(id) {
     generatePDF(quote);
 }
 
-// --- ADMIN / CLEAR DB ---
+// --- ADMIN ---
 async function clearDatabase() {
     if(confirm("Are you sure? This will delete all saved quotes from this device.")) {
         await db.clear();
@@ -111,8 +154,7 @@ async function clearDatabase() {
 function generatePDF(data) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-
-    const brandDark = [74, 55, 40]; // #4a3728
+    const brandDark = [74, 55, 40]; 
     
     doc.setFillColor(...brandDark);
     doc.rect(0, 0, 210, 35, 'F');
@@ -146,14 +188,29 @@ function generatePDF(data) {
     let y = 106;
     doc.setFont("helvetica", "normal");
     
-    const items = [
-        ["Materials", data.breakdown.materials],
+    // Check if new v1.2 material list exists
+    if (data.breakdown.materialsList && data.breakdown.materialsList.length > 0) {
+        data.breakdown.materialsList.forEach(m => {
+            const lineText = `${m.qty ? m.qty + ' x ' : ''}${m.desc || 'Material'}`;
+            doc.text(lineText, 20, y);
+            if(m.cost > 0) doc.text(`£${m.cost.toFixed(2)}`, 170, y);
+            y += 10;
+        });
+    } else if (data.breakdown.materials > 0) {
+        // Fallback for older v1.1 quotes
+        doc.text("Materials", 20, y);
+        doc.text(`£${data.breakdown.materials.toFixed(2)}`, 170, y);
+        y += 10;
+    }
+
+    // Add remaining fixed costs
+    const remainingItems = [
         ["Fuel & Travel", data.breakdown.fuel],
         ["Misc. Expenses", data.breakdown.misc],
         ["Labour", data.breakdown.labour]
     ];
 
-    items.forEach(item => {
+    remainingItems.forEach(item => {
         if (item[1] > 0) { 
             doc.text(item[0], 20, y);
             doc.text(`£${item[1].toFixed(2)}`, 170, y);
